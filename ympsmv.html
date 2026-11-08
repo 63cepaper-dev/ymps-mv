@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 照片音樂 MV 工作站</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #090d16;
+            color: #f8fafc;
+            overscroll-behavior: none;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        input[type="range"] { accent-color: #10b981; }
+        .tab-active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39);
+        }
+        .canvas-aspect {
+            aspect-ratio: 16 / 9;
+            width: 100%;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-emerald-500 selection:text-white">
+
+    <!-- 頂部置頂浮動面板 (防手機注音鍵盤遮擋) -->
+    <div id="filenameModal" class="hidden fixed top-0 left-0 right-0 z-50 bg-slate-900/95 backdrop-blur-md border-b-2 border-emerald-500 shadow-2xl p-4 transition-all">
+        <div class="max-w-2xl mx-auto flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    ✏️ 設定輸出 MP4 檔案名稱（頂部防鍵盤遮擋模式）
+                </span>
+                <button type="button" onclick="document.getElementById('filenameModal').classList.add('hidden')" class="text-xs text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800">關閉 ✕</button>
+            </div>
+            <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                <input type="text" id="filenameModalInput" placeholder="請輸入檔案名稱..." 
+                    class="flex-1 min-w-[180px] bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-lg px-3 py-2 text-white font-bold text-base outline-none">
+                <button id="bringSongTitleBtn" type="button" 
+                    class="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap shadow">
+                    🎵 帶入歌名
+                </button>
+                <button id="confirmFilenameBtn" type="button" 
+                    class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold rounded-lg whitespace-nowrap shadow">
+                    ✅ 確定
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-400">💡 點擊「立即下載」時將自動於檔名尾端加上當下時分秒，確保每次檔名唯一。</p>
+        </div>
+    </div>
+
+    <!-- 頂部導覽列 -->
+    <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-purple-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 font-black text-xl">
+                    🎬
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-black tracking-tight bg-gradient-to-r from-emerald-400 via-teal-200 to-purple-400 bg-clip-text text-transparent">
+                        AI 照片音樂 MV 工作站
+                    </h1>
+                    <p class="text-[11px] text-slate-400">WebCodecs 1080P 30FPS 離線算圖 · 智慧人臉置中與點擊錄製時間軸版</p>
+                </div>
+            </div>
+
+            <nav class="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 w-full sm:w-auto justify-between sm:justify-start">
+                <button type="button" onclick="switchTab(1)" id="tabBtn1" class="tab-active flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5">
+                    <span>1️⃣</span> 音樂與照片池
+                </button>
+                <button type="button" onclick="switchTab(2)" id="tabBtn2" class="text-slate-400 hover:text-white flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5">
+                    <span>2️⃣</span> 純歌詞與對齊
+                </button>
+                <button type="button" onclick="switchTab(3)" id="tabBtn3" class="text-slate-400 hover:text-white flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5">
+                    <span>3️⃣</span> 預覽與匯出
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 主內容區 -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+        <!-- ==================== 步驟 1：音樂與照片池 ==================== -->
+        <section id="step1" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- 左側：音樂上傳與動態頻譜 -->
+                <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+                                🎵 步驟 1-A：上傳背景音樂
+                            </h2>
+                            <span id="audioDurationBadge" class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full font-mono">
+                                尚未載入音訊
+                            </span>
+                        </div>
+
+                        <!-- 音樂上傳點擊容器（內嵌直接 onclick 觸發確保 100% 有反應） -->
+                        <div id="audioUploadBox" onclick="document.getElementById('audioInput').click()" class="border-2 border-dashed border-slate-700 hover:border-emerald-500 bg-slate-950/60 rounded-xl p-4 text-center transition group cursor-pointer">
+                            <input type="file" id="audioInput" accept="audio/*" class="hidden">
+                            <div class="text-2xl mb-1 group-hover:scale-110 transition">🎧</div>
+                            <p id="audioFileName" class="text-sm font-bold text-slate-200 truncate">點擊選擇音樂檔案 (.mp3 / .wav / .m4a / .ogg)</p>
+                            <p class="text-xs text-slate-400 mt-1">上傳後自動解析精確秒數並均分照片時長</p>
+                        </div>
+
+                        <!-- 獨立試聽播放器 + 綠紫雙色動態跳動頻譜 Canvas -->
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-3">
+                            <div class="flex items-center justify-between text-xs text-slate-400">
+                                <span>📊 Web Audio 綠紫雙色動態頻譜</span>
+                                <span id="step1TimeText" class="font-mono text-emerald-400 font-bold">00:00.0 / 00:00.0</span>
+                            </div>
+                            <canvas id="spectrumCanvas" width="460" height="90" class="w-full h-24 bg-slate-900/90 rounded-lg border border-slate-800/80"></canvas>
+                            
+                            <div class="flex items-center gap-3 pt-1">
+                                <button id="step1PlayBtn" type="button" disabled class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-bold text-xs flex items-center gap-1.5 transition">
+                                    ▶ 播放試聽
+                                </button>
+                                <input type="range" id="step1SeekSlider" min="0" max="100" step="0.05" value="0" disabled class="flex-1 h-2 bg-slate-800 rounded-lg cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ken Burns 運鏡模式選單 & 智慧人臉置中選項 -->
+                    <div class="pt-3 border-t border-slate-800 space-y-3">
+                        <div>
+                            <label for="kenBurnsMode" class="block text-sm font-bold text-purple-400 mb-1">
+                                🎥 5 種 Ken Burns 電影級運鏡模式
+                            </label>
+                            <select id="kenBurnsMode" class="w-full bg-slate-950 border border-slate-700 focus:border-purple-500 rounded-xl px-3.5 py-2.5 text-sm text-white font-semibold outline-none">
+                                <option value="smart">✨ 智慧交替（奇數張緩慢放大、偶數張緩慢縮小 + 微平移）</option>
+                                <option value="zoomIn">🔍 全部放大（全體緩慢拉近聚焦）</option>
+                                <option value="zoomOut">🖼️ 全部縮小（全體由特寫緩慢拉遠）</option>
+                                <option value="pan">↔️ 水平平移（左右絲滑橫移運鏡）</option>
+                                <option value="static">⏹️ 靜態滿版（無縮放平移，居中裁切填滿）</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <div>
+                                <span class="text-xs font-bold text-emerald-400 block">👤 智慧人臉優先構圖（防裁切）</span>
+                                <span class="text-[11px] text-slate-400">算圖時自動對焦並略微上調畫面中心，避免頭部遭裁切</span>
+                            </div>
+                            <input type="checkbox" id="smartFaceFocus" checked class="w-4 h-4 accent-emerald-500 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：批次照片池 -->
+                <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+                    <div class="space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+                                    🖼️ 步驟 1-B：批次照片池（自動均分歌曲時長）
+                                </h2>
+                                <p id="photoAllocationInfo" class="text-xs text-slate-400 mt-0.5">
+                                    請先加入照片（支援一次選取多張 JPG/PNG/WebP）
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" id="triggerPhotoBtn" onclick="document.getElementById('photoInput').click()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 transition cursor-pointer">
+                                    <span>➕ 批次新增照片</span>
+                                    <input type="file" id="photoInput" accept="image/*" multiple class="hidden">
+                                </button>
+                                <button type="button" id="clearPhotosBtn" class="px-3 py-2 bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white font-bold text-xs rounded-xl transition">
+                                    🗑️ 清空
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="photoGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[380px] overflow-y-auto p-2 bg-slate-950/70 rounded-xl border border-slate-800 min-h-[240px]">
+                            <div class="col-span-full flex flex-col items-center justify-center text-slate-500 py-16">
+                                <div class="text-4xl mb-2">📸</div>
+                                <p class="text-sm font-semibold">尚無照片，請點擊右上角「批次新增照片」</p>
+                                <p class="text-xs mt-1">系統將依音樂總長度自動為每張照片分配顯示區間</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end pt-2 border-t border-slate-800">
+                        <button type="button" onclick="switchTab(2)" class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm rounded-xl shadow-lg transition flex items-center gap-2">
+                            下一步：設定歌詞與時間對齊 ➔
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== 步驟 2：純歌詞與對齊 ==================== -->
+        <section id="step2" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- 左側：純歌詞或時間碼貼上區 / 點擊錄製模式 -->
+                <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col space-y-4 shadow-xl">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h2 class="text-base font-bold text-emerald-400">📝 歌詞編輯與點擊錄製時間軸</h2>
+                            <p class="text-xs text-slate-400">貼上純歌詞，或匯入 SRT/LRC 檔；也可使用「點擊錄製模式」跟隨音樂節奏即時打點！</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="triggerSubtitleBtn" onclick="document.getElementById('subtitleFileInput').click()" class="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+                            <span>📂 匯入 SRT/LRC</span>
+                            <input type="file" id="subtitleFileInput" accept=".srt,.lrc,.vtt,.txt" class="hidden">
+                        </button>
+                        <button id="exportSrtBtn" type="button" class="px-3 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-slate-700 transition">
+                            ⬇️ 匯出 SRT
+                        </button>
+                        <button id="exportLrcBtn" type="button" class="px-3 py-2 bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white font-bold text-xs rounded-xl border border-slate-700 transition">
+                            ⬇️ 匯出 LRC
+                        </button>
+                        <button id="toggleTapRecordMode" type="button" class="ml-auto px-3.5 py-2 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-bold text-xs rounded-xl shadow transition">
+                            🔴 進入點擊錄製模式
+                        </button>
+                    </div>
+
+                    <div id="textEditorBox" class="space-y-3 flex-1 flex flex-col">
+                        <textarea id="lyricsTextarea" rows="8" placeholder="在此貼上純歌詞（每行一句），例如：&#10;陽光灑在熟悉的操場&#10;我們一起大聲歌唱&#10;三六水啦 夢想啟航"
+                            class="w-full flex-1 bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl p-3 text-sm text-slate-100 font-mono leading-relaxed outline-none resize-none"></textarea>
+                        
+                        <div class="flex items-center justify-between pt-1">
+                            <span class="text-xs text-slate-400">💡 系統會自動過濾 SRT 序號與時間軸，只抓取純文字歌詞</span>
+                            <button id="parseLyricsBtn" type="button" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow transition">
+                                ⚡ 解析純歌詞 / 自動分配時間
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 🔴 點擊錄製時間軸互動面板 (Tap-to-Sync Mode) -->
+                    <div id="tapRecordBox" class="hidden bg-slate-950 border-2 border-emerald-500/80 rounded-xl p-4 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                                🔴 點擊錄製模式（隨音樂播放打點）
+                            </span>
+                            <span id="tapRecordStatus" class="text-xs font-mono font-bold text-yellow-400">尚未開始播放音樂</span>
+                        </div>
+                        <p class="text-xs text-slate-300">
+                            操作說明：點擊下方「▶ 播放音樂並開始錄製」，當音樂唱到特定歌詞時，點擊 **「📍 記錄這一句時間」**，系統將自動為當前句賦予開始與結束秒數！
+                        </p>
+                        <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center space-y-2">
+                            <div id="currentTapLyricDisplay" class="text-base sm:text-lg font-black text-emerald-300 min-h-[32px] flex items-center justify-center">
+                                請先於上方輸入純歌詞並點擊「解析」
+                            </div>
+                            <div class="flex items-center justify-center gap-2">
+                                <button id="tapPlayMusicBtn" type="button" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg shadow transition">
+                                    ▶ 播放音樂試聽
+                                </button>
+                                <button id="tapRecordClickBtn" type="button" disabled class="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-black text-sm rounded-xl shadow transition">
+                                    📍 記錄這一句時間 (Space / 點擊)
+                                </button>
+                            </div>
+                        </div>
+                        <button id="exitTapRecordBtn" type="button" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg transition">
+                            ⬅ 離開點擊錄製模式
+                        </button>
+                    </div>
+
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                        <div class="flex items-center justify-between text-xs font-bold text-purple-400">
+                            <span>⏱️ 歌詞時間整體往前後退微調</span>
+                            <span id="timeShiftValueLabel" class="font-mono text-emerald-400">+0.0 秒</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="shiftAllSubtitleTime(-1.0)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition">-1.0秒</button>
+                            <button type="button" onclick="shiftAllSubtitleTime(-0.5)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition">-0.5秒</button>
+                            <button type="button" onclick="shiftAllSubtitleTime(0.5)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition">+0.5秒</button>
+                            <button type="button" onclick="shiftAllSubtitleTime(1.0)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg transition">+1.0秒</button>
+                            <button type="button" onclick="resetAllSubtitleTime()" class="ml-auto px-3 py-1.5 bg-rose-600/80 hover:bg-rose-500 text-white text-xs font-bold rounded-lg transition">重置歸零</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右側：時間軸對齊清單 -->
+                <div class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-xl">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-base font-bold text-purple-400">⏱️ 字幕時間對齊清單（點擊行可跳轉預覽）</h2>
+                                <p class="text-xs text-slate-400">可直接微調每句開始/結束秒數，或點擊任意行立即試聽該段時間點</p>
+                            </div>
+                            <span id="subtitleCountBadge" class="text-xs bg-slate-800 text-emerald-400 px-2.5 py-1 rounded-full font-bold">
+                                0 句字幕
+                            </span>
+                        </div>
+
+                        <div id="subtitleListContainer" class="max-h-[380px] overflow-y-auto space-y-2 pr-1 bg-slate-950/60 p-3 rounded-xl border border-slate-800 min-h-[300px]">
+                            <div class="text-center text-slate-500 py-20 text-sm">
+                                尚未建立字幕清單，請於左側輸入歌詞或匯入字幕檔
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <button type="button" onclick="switchTab(1)" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm rounded-xl transition">
+                            ⬅ 返回步驟 1
+                        </button>
+                        <button type="button" onclick="switchTab(3)" class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-sm rounded-xl shadow-lg transition">
+                            下一步：1080P 預覽與匯出 ➔
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==================== 步驟 3：預覽與匯出 ==================== -->
+        <section id="step3" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-xl">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-md text-xs font-bold">
+                                1920 × 1080 Full HD
+                            </span>
+                            <h2 class="text-sm sm:text-base font-bold text-slate-100">即時滿版畫布預覽</h2>
+                        </div>
+                        <span id="previewTimeDisplay" class="font-mono text-xs sm:text-sm text-emerald-400 font-bold">
+                            00:00.0 / 00:00.0
+                        </span>
+                    </div>
+
+                    <div class="canvas-aspect bg-black rounded-xl overflow-hidden border border-slate-800 shadow-2xl relative">
+                        <canvas id="mvCanvas" width="1920" height="1080" class="w-full h-full block"></canvas>
+                    </div>
+
+                    <div class="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                        <button id="previewPlayBtn" type="button" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-lg transition whitespace-nowrap">
+                            ▶ 播放預覽
+                        </button>
+                        <input type="range" id="previewSeekSlider" min="0" max="100" step="0.03" value="0" class="flex-1 h-2 bg-slate-800 rounded-lg cursor-pointer">
+                    </div>
+
+                    <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="space-y-0.5">
+                                <div class="text-xs text-slate-400">目前輸出檔案名稱設定：</div>
+                                <div class="flex items-center gap-2">
+                                    <span id="currentFilenameLabel" class="text-sm sm:text-base font-black text-emerald-400 break-all">AI_音樂MV作品</span>
+                                    <span class="text-xs text-slate-500 font-mono">_時分秒.mp4</span>
+                                </div>
+                            </div>
+                            <button id="openFilenameModalBtn" type="button" onclick="document.getElementById('filenameModal').classList.remove('hidden')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5">
+                                ✏️ 修改檔名
+                            </button>
+                        </div>
+
+                        <div id="renderProgressBox" class="hidden space-y-2 pt-2 border-t border-slate-800">
+                            <div class="flex items-center justify-between text-xs">
+                                <span id="renderStatusText" class="text-emerald-400 font-bold">正在啟動 WebCodecs 30FPS 離線逐幀算圖...</span>
+                                <span id="renderPercentText" class="font-mono font-bold text-white">0%</span>
+                            </div>
+                            <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                                <div id="renderProgressBar" class="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-purple-500 w-0 transition-all duration-150"></div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-3 pt-1">
+                            <button id="startRenderBtn" type="button" class="flex-1 min-w-[200px] py-3 px-5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm sm:text-base rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                                🚀 開始合成 1080P MP4 影片
+                            </button>
+                            <button id="manualDownloadBtn" type="button" class="hidden flex-1 min-w-[200px] py-3 px-5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-sm sm:text-base rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                                💾 立即下載 MP4（自動附加時分秒）
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-5 shadow-xl">
+                    <h2 class="text-base font-bold text-emerald-400 border-b border-slate-800 pb-2.5">
+                        🎨 字幕樣式與音效強化控制台（即時預覽）
+                    </h2>
+
+                    <div class="space-y-1.5">
+                        <label for="subPosY" class="block text-xs font-bold text-slate-300">
+                            📍 字幕垂直位置（預設貼齊最底邊 96% 避開人臉）
+                        </label>
+                        <select id="subPosY" class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-sm text-white font-bold outline-none">
+                            <option value="0.96" selected>⬇️ 貼齊最底邊 96%（極致避開人臉 · 預設）</option>
+                            <option value="0.90">🔽 底部經典區 90%</option>
+                            <option value="0.82">🔉 中下舒適區 82%</option>
+                            <option value="0.50">⏺️ 畫面正中央 50%</option>
+                            <option value="0.12">⬆️ 頂部標題區 12%</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label for="subFontFamily" class="block text-xs font-bold text-slate-300">
+                            🔤 字體風格
+                        </label>
+                        <select id="subFontFamily" class="w-full bg-slate-950 border border-slate-700 focus:border-emerald-500 rounded-xl px-3 py-2 text-sm text-white font-bold outline-none">
+                            <option value="'Noto Sans TC', 'Microsoft JhengHei', sans-serif">思源黑體 / 微軟正黑體（現代清晰）</option>
+                            <option value="'Noto Serif TC', 'PMingLiU', serif">思源宋體 / 明體（文青抒情）</option>
+                            <option value="'DFKai-SB', 'BiauKai', 'Noto Serif TC', serif">標楷體（書法人文）</option>
+                            <option value="system-ui, -apple-system, sans-serif">系統圓體 / 無襯線粗體</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                            <div class="flex justify-between text-xs font-bold">
+                                <span class="text-slate-300">🔠 字體大小</span>
+                                <span id="subFontSizeVal" class="text-emerald-400 font-mono">64px</span>
+                            </div>
+                            <input type="range" id="subFontSize" min="36" max="110" step="2" value="64" class="w-full">
+                        </div>
+
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+                            <div class="flex justify-between text-xs font-bold">
+                                <span class="text-slate-300">🖤 深黑外框粗細</span>
+                                <span id="subOutlineWidthVal" class="text-emerald-400 font-mono">10px</span>
+                            </div>
+                            <input type="range" id="subOutlineWidth" min="0" max="24" step="1" value="10" class="w-full">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-slate-300">🌈 字幕顏色</span>
+                            <span id="subColorHexLabel" class="text-xs font-mono text-emerald-400">#FFFFFF</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <button type="button" onclick="setSubtitleColor('#FFFFFF')" class="w-7 h-7 rounded-full bg-white border-2 border-slate-500 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#FACC15')" class="w-7 h-7 rounded-full bg-yellow-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#34D399')" class="w-7 h-7 rounded-full bg-emerald-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#38BDF8')" class="w-7 h-7 rounded-full bg-sky-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#F472B6')" class="w-7 h-7 rounded-full bg-pink-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#C084FC')" class="w-7 h-7 rounded-full bg-purple-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <button type="button" onclick="setSubtitleColor('#FB923C')" class="w-7 h-7 rounded-full bg-orange-400 border-2 border-slate-700 hover:scale-110 transition"></button>
+                            <div class="ml-auto flex items-center gap-1.5 pl-2 border-l border-slate-800">
+                                <label for="subCustomColor" class="text-xs text-slate-400 cursor-pointer">自訂：</label>
+                                <input type="color" id="subCustomColor" value="#FFFFFF" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-purple-400">🔊 音量倍增滑桿（內建 Math.tanh 軟削波）</span>
+                            <span id="volumeBoostVal" class="text-xs font-mono font-bold text-emerald-400">100%</span>
+                        </div>
+                        <input type="range" id="volumeBoostSlider" min="100" max="300" step="5" value="100" class="w-full">
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <audio id="mainAudio" crossorigin="anonymous" class="hidden"></audio>
+
+    <script>
+        const state = {
+            audioFile: null, audioBuffer: null, audioDuration: 0,
+            songTitle: 'AI_音樂MV作品', exportBaseName: 'AI_音樂MV作品',
+            photos: [], subtitles: [], kenBurnsMode: 'smart',
+            smartFaceFocus: true, totalTimeShift: 0,
+            subStyle: { posY: 0.96, fontFamily: "'Noto Sans TC', sans-serif", fontSize: 64, outlineWidth: 10, color: '#FFFFFF' },
+            volumeBoost: 1.0, renderedMp4Buffer: null, isRendering: false,
+            tapRecordActive: false, tapLyricsLines: [], tapCurrentIdx: 0, tapStartTime: 0
+        };
+
+        const mainAudio = document.getElementById('mainAudio');
+        const audioInput = document.getElementById('audioInput');
+        const photoInput = document.getElementById('photoInput');
+        const subtitleFileInput = document.getElementById('subtitleFileInput');
+        const lyricsTextarea = document.getElementById('lyricsTextarea');
+        const parseLyricsBtn = document.getElementById('parseLyricsBtn');
+        const subtitleListContainer = document.getElementById('subtitleListContainer');
+        const subtitleCountBadge = document.getElementById('subtitleCountBadge');
+        const timeShiftValueLabel = document.getElementById('timeShiftValueLabel');
+        const toggleTapRecordModeBtn = document.getElementById('toggleTapRecordMode');
+        const textEditorBox = document.getElementById('textEditorBox');
+        const tapRecordBox = document.getElementById('tapRecordBox');
+        const tapRecordStatus = document.getElementById('tapRecordStatus');
+        const currentTapLyricDisplay = document.getElementById('currentTapLyricDisplay');
+        const tapPlayMusicBtn = document.getElementById('tapPlayMusicBtn');
+        const tapRecordClickBtn = document.getElementById('tapRecordClickBtn');
+        const exitTapRecordBtn = document.getElementById('exitTapRecordBtn');
+
+        const mvCanvas = document.getElementById('mvCanvas');
+        const mvCtx = mvCanvas.getContext('2d');
+        const previewPlayBtn = document.getElementById('previewPlayBtn');
+        const previewSeekSlider = document.getElementById('previewSeekSlider');
+        const previewTimeDisplay = document.getElementById('previewTimeDisplay');
+
+        const filenameModalInput = document.getElementById('filenameModalInput');
+        const currentFilenameLabel = document.getElementById('currentFilenameLabel');
+        const startRenderBtn = document.getElementById('startRenderBtn');
+        const manualDownloadBtn = document.getElementById('manualDownloadBtn');
+        const renderProgressBox = document.getElementById('renderProgressBox');
+        const renderStatusText = document.getElementById('renderStatusText');
+        const renderPercentText = document.getElementById('renderPercentText');
+        const renderProgressBar = document.getElementById('renderProgressBar');
+
+        let audioCtx = null, analyserNode = null, gainNode = null, shaperNode = null, sourceNode = null;
+
+        function switchTab(tabIndex) {
+            [1, 2, 3].forEach(i => {
+                const sec = document.getElementById(`step${i}`);
+                const btn = document.getElementById(`tabBtn${i}`);
+                if (i === tabIndex) {
+                    sec?.classList.remove('hidden');
+                    btn?.classList.add('tab-active');
+                    btn?.classList.remove('text-slate-400');
+                } else {
+                    sec?.classList.add('hidden');
+                    btn?.classList.remove('tab-active');
+                    btn?.classList.add('text-slate-400');
+                }
+            });
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        }
+
+        function formatTime(sec) {
+            if (!isFinite(sec) || sec < 0) sec = 0;
+            const m = Math.floor(sec / 60);
+            const s = (sec % 60).toFixed(1);
+            return `${String(m).padStart(2, '0')}:${s.padStart(4, '0')}`;
+        }
+
+        function formatSrtTime(sec) {
+            if (!isFinite(sec) || sec < 0) sec = 0;
+            const hrs = Math.floor(sec / 3600);
+            const mins = Math.floor((sec % 3600) / 60);
+            const secs = Math.floor(sec % 60);
+            const ms = Math.round((sec - Math.floor(sec)) * 1000);
+            return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+        }
+
+        function formatLrcTime(sec) {
+            if (!isFinite(sec) || sec < 0) sec = 0;
+            const mins = Math.floor(sec / 60);
+            const secs = Math.floor(sec % 60);
+            const cs = Math.round((sec - Math.floor(sec)) * 100);
+            return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(cs).padStart(2, '0')}]`;
+        }
+
+        function initWebAudio() {
+            if (audioCtx) return;
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContextClass();
+            sourceNode = audioCtx.createMediaElementSource(mainAudio);
+            gainNode = audioCtx.createGain();
+            shaperNode = audioCtx.createWaveShaper();
+            analyserNode = audioCtx.createAnalyser();
+            analyserNode.fftSize = 128;
+
+            const curve = new Float32Array(65536);
+            for (let i = 0; i < 65536; i++) {
+                const x = (i * 2) / 65536 - 1;
+                curve[i] = Math.tanh(x);
+            }
+            shaperNode.curve = curve;
+            shaperNode.oversample = '2x';
+
+            sourceNode.connect(gainNode);
+            gainNode.connect(shaperNode);
+            shaperNode.connect(analyserNode);
+            analyserNode.connect(audioCtx.destination);
+        }
+
+        audioInput?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            state.audioFile = file;
+            const rawName = file.name.replace(/\.[^/.]+$/, '');
+            state.songTitle = rawName || 'AI_音樂MV作品';
+            state.exportBaseName = state.songTitle;
+            if (currentFilenameLabel) currentFilenameLabel.textContent = state.exportBaseName;
+            if (filenameModalInput) filenameModalInput.value = state.exportBaseName;
+            
+            const audioFileName = document.getElementById('audioFileName');
+            if (audioFileName) audioFileName.textContent = `🎵 ${file.name}`;
+            
+            mainAudio.src = URL.createObjectURL(file);
+            const arrayBuf = await file.arrayBuffer();
+            const TempAudioCtx = window.AudioContext || window.webkitAudioContext;
+            const tempCtx = new TempAudioCtx();
+            state.audioBuffer = await tempCtx.decodeAudioData(arrayBuf);
+            state.audioDuration = state.audioBuffer.duration;
+            await tempCtx.close();
+
+            const audioDurationBadge = document.getElementById('audioDurationBadge');
+            if (audioDurationBadge) audioDurationBadge.textContent = `總長 ${formatTime(state.audioDuration)}`;
+            const step1PlayBtn = document.getElementById('step1PlayBtn');
+            const step1SeekSlider = document.getElementById('step1SeekSlider');
+            if (step1PlayBtn) step1PlayBtn.disabled = false;
+            if (step1SeekSlider) { step1SeekSlider.disabled = false; step1SeekSlider.max = state.audioDuration; }
+            if (previewSeekSlider) previewSeekSlider.max = state.audioDuration;
+
+            updatePhotoAllocationUI();
+            if (lyricsTextarea?.value.trim()) parseAndAlignLyrics();
+            updateTimeUI(0);
+            drawPreviewFrame(0);
+        });
+
+        function togglePlay() {
+            if (!state.audioBuffer && !mainAudio.src) {
+                alert('請先在步驟 1 上傳音樂檔案！');
+                return;
+            }
+            initWebAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const step1PlayBtn = document.getElementById('step1PlayBtn');
+            if (mainAudio.paused) {
+                mainAudio.play();
+                if (step1PlayBtn) step1PlayBtn.textContent = '⏸ 暫停試聽';
+                if (previewPlayBtn) previewPlayBtn.textContent = '⏸ 暫停預覽';
+            } else {
+                mainAudio.pause();
+                if (step1PlayBtn) step1PlayBtn.textContent = '▶ 播放試聽';
+                if (previewPlayBtn) previewPlayBtn.textContent = '▶ 播放預覽';
+            }
+        }
+
+        document.getElementById('step1PlayBtn')?.addEventListener('click', togglePlay);
+        previewPlayBtn?.addEventListener('click', togglePlay);
+
+        mainAudio?.addEventListener('ended', () => {
+            const step1PlayBtn = document.getElementById('step1PlayBtn');
+            if (step1PlayBtn) step1PlayBtn.textContent = '▶ 播放試聽';
+            if (previewPlayBtn) previewPlayBtn.textContent = '▶ 播放預覽';
+            if (state.tapRecordActive) {
+                if (tapRecordStatus) tapRecordStatus.textContent = '🎵 音樂播放完畢！';
+                if (tapRecordClickBtn) tapRecordClickBtn.disabled = true;
+            }
+        });
+
+        document.getElementById('step1SeekSlider')?.addEventListener('input', (e) => {
+            const t = parseFloat(e.target.value);
+            mainAudio.currentTime = t;
+            updateTimeUI(t);
+            drawPreviewFrame(t);
+        });
+
+        previewSeekSlider?.addEventListener('input', (e) => {
+            const t = parseFloat(e.target.value);
+            mainAudio.currentTime = t;
+            updateTimeUI(t);
+            drawPreviewFrame(t);
+        });
+
+        function updateTimeUI(cur) {
+            const dur = state.audioDuration || mainAudio.duration || 0;
+            const step1SeekSlider = document.getElementById('step1SeekSlider');
+            if (step1SeekSlider) step1SeekSlider.value = cur;
+            if (previewSeekSlider) previewSeekSlider.value = cur;
+            const txt = `${formatTime(cur)} / ${formatTime(dur)}`;
+            const step1TimeText = document.getElementById('step1TimeText');
+            if (step1TimeText) step1TimeText.textContent = txt;
+            const previewTimeDisplay = document.getElementById('previewTimeDisplay');
+            if (previewTimeDisplay) previewTimeDisplay.textContent = txt;
+        }
+
+        function animationLoop() {
+            const spectrumCanvas = document.getElementById('spectrumCanvas');
+            if (spectrumCanvas) {
+                const spectrumCtx = spectrumCanvas.getContext('2d');
+                const w = spectrumCanvas.width;
+                const h = spectrumCanvas.height;
+                spectrumCtx.clearRect(0, 0, w, h);
+
+                if (analyserNode && !mainAudio.paused) {
+                    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+                    analyserNode.getByteFrequencyData(dataArray);
+                    const barCount = 40, barWidth = (w / barCount) - 3;
+                    for (let i = 0; i < barCount; i++) {
+                        const val = dataArray[i] || 0;
+                        const barHeight = Math.max(4, (val / 255) * (h - 8));
+                        const x = i * (barWidth + 3) + 2, y = h - barHeight;
+                        const grad = spectrumCtx.createLinearGradient(0, y, 0, h);
+                        grad.addColorStop(0, '#34d399'); grad.addColorStop(0.5, '#10b981'); grad.addColorStop(1, '#9333ea');
+                        spectrumCtx.fillStyle = grad; spectrumCtx.fillRect(x, y, barWidth, barHeight);
+                    }
+                } else {
+                    const barCount = 40, barWidth = (w / barCount) - 3;
+                    for (let i = 0; i < barCount; i++) {
+                        const barHeight = 6 + Math.sin(i * 0.4) * 3;
+                        const x = i * (barWidth + 3) + 2, y = h - barHeight;
+                        spectrumCtx.fillStyle = '#1e293b'; spectrumCtx.fillRect(x, y, barWidth, barHeight);
+                    }
+                }
+            }
+            if (!mainAudio.paused && !state.isRendering) {
+                updateTimeUI(mainAudio.currentTime);
+                drawPreviewFrame(mainAudio.currentTime);
+            }
+            requestAnimationFrame(animationLoop);
+        }
+        requestAnimationFrame(animationLoop);
+
+        photoInput?.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            if (!files.length) return;
+            for (const file of files) {
+                const url = URL.createObjectURL(file);
+                const img = await new Promise((resolve) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.src = url;
+                });
+                state.photos.push({ id: Date.now() + Math.random().toString(36).substring(2, 7), file, url, img });
+            }
+            photoInput.value = '';
+            renderPhotoGrid();
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+
+        document.getElementById('clearPhotosBtn')?.addEventListener('click', () => {
+            state.photos.forEach(p => URL.revokeObjectURL(p.url));
+            state.photos = [];
+            renderPhotoGrid();
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+
+        window.removePhotoById = function(id) {
+            const idx = state.photos.findIndex(p => p.id === id);
+            if (idx !== -1) {
+                URL.revokeObjectURL(state.photos[idx].url);
+                state.photos.splice(idx, 1);
+                renderPhotoGrid();
+                drawPreviewFrame(mainAudio.currentTime || 0);
+            }
+        };
+
+        function updatePhotoAllocationUI() {
+            const count = state.photos.length, dur = state.audioDuration || 30;
+            if (photoAllocationInfo) {
+                photoAllocationInfo.textContent = count === 0 ? '請先加入照片' : `已載入 ${count} 張照片 · 每張自動均分 ${(dur / count).toFixed(2)} 秒`;
+            }
+        }
+
+        function renderPhotoGrid() {
+            updatePhotoAllocationUI();
+            if (!photoGrid) return;
+            if (state.photos.length === 0) {
+                photoGrid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-slate-500 py-16"><div class="text-4xl mb-2">📸</div><p class="text-sm font-semibold">尚無照片，請點擊「批次新增照片」</p></div>`;
+                return;
+            }
+            const dur = state.audioDuration || 30, seg = dur / state.photos.length;
+            photoGrid.innerHTML = state.photos.map((p, index) => `
+                <div class="relative group bg-slate-900 rounded-xl overflow-hidden border border-slate-800 shadow">
+                    <img src="${p.url}" alt="photo-${index+1}" class="w-full h-28 object-cover">
+                    <div class="p-2 flex items-center justify-between text-[11px] bg-slate-950/90">
+                        <span class="font-bold text-emerald-400">#${index + 1}</span>
+                        <span class="font-mono text-slate-400">${(index*seg).toFixed(1)}s~${((index+1)*seg).toFixed(1)}s</span>
+                    </div>
+                    <button type="button" onclick="removePhotoById('${p.id}')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 text-white text-xs font-bold flex items-center justify-center">✕</button>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('kenBurnsMode')?.addEventListener('change', (e) => {
+            state.kenBurnsMode = e.target.value;
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+
+        document.getElementById('smartFaceFocus')?.addEventListener('change', (e) => {
+            state.smartFaceFocus = e.target.checked;
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+
+        // 🔴 點擊錄製模式
+        toggleTapRecordModeBtn?.addEventListener('click', () => {
+            const raw = lyricsTextarea?.value.trim();
+            if (!raw) { alert('請先輸入純歌詞！'); return; }
+            const lines = parseCleanLinesOnly(raw);
+            if (!lines.length) { alert('未找到有效的歌詞！'); return; }
+
+            state.tapLyricsLines = lines;
+            state.tapCurrentIdx = 0;
+            state.tapStartTime = 0;
+            state.subtitles = [];
+
+            textEditorBox?.classList.add('hidden');
+            tapRecordBox?.classList.remove('hidden');
+            toggleTapRecordModeBtn?.classList.add('hidden');
+            updateTapRecordUI();
+        });
+
+        exitTapRecordBtn?.addEventListener('click', () => {
+            if (!mainAudio.paused) mainAudio.pause();
+            state.tapRecordActive = false;
+            tapRecordBox?.classList.add('hidden');
+            textEditorBox?.classList.remove('hidden');
+            toggleTapRecordModeBtn?.classList.remove('hidden');
+            renderSubtitleList();
+        });
+
+        tapPlayMusicBtn?.addEventListener('click', () => {
+            if (!state.audioBuffer && !mainAudio.src) { alert('請先上傳音樂！'); return; }
+            initWebAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (mainAudio.paused) {
+                mainAudio.currentTime = 0;
+                mainAudio.play();
+                state.tapRecordActive = true;
+                tapPlayMusicBtn.textContent = '⏸ 暫停音樂';
+                if (tapRecordClickBtn) tapRecordClickBtn.disabled = false;
+                if (tapRecordStatus) tapRecordStatus.textContent = '🔴 錄製中...';
+            } else {
+                mainAudio.pause();
+                state.tapRecordActive = false;
+                tapPlayMusicBtn.textContent = '▶ 播放音樂試聽';
+                if (tapRecordClickBtn) tapRecordClickBtn.disabled = true;
+                if (tapRecordStatus) tapRecordStatus.textContent = '⏸ 已暫停';
+            }
+        });
+
+        function recordCurrentTap() {
+            if (!state.tapRecordActive && mainAudio.paused) return;
+            if (state.tapCurrentIdx >= state.tapLyricsLines.length) return;
+            const nowTime = mainAudio.currentTime;
+            const text = state.tapLyricsLines[state.tapCurrentIdx];
+            if (state.tapCurrentIdx === 0) state.tapStartTime = Math.max(0, nowTime - 0.2);
+            
+            state.subtitles.push({ start: Number(state.tapStartTime.toFixed(2)), end: Number(nowTime.toFixed(2)), text });
+            state.tapStartTime = nowTime;
+            state.tapCurrentIdx++;
+            updateTapRecordUI();
+            renderSubtitleList();
+
+            if (state.tapCurrentIdx >= state.tapLyricsLines.length) {
+                state.tapRecordActive = false;
+                mainAudio.pause();
+                if (tapRecordStatus) tapRecordStatus.textContent = '✅ 錄製完成！';
+                if (tapRecordClickBtn) tapRecordClickBtn.disabled = true;
+            }
+        }
+
+        tapRecordClickBtn?.addEventListener('click', recordCurrentTap);
+        window.addEventListener('keydown', (e) => {
+            if (state.tapRecordActive && e.code === 'Space') { e.preventDefault(); recordCurrentTap(); }
+        });
+
+        function updateTapRecordUI() {
+            if (!currentTapLyricDisplay) return;
+            if (state.tapCurrentIdx < state.tapLyricsLines.length) {
+                currentTapLyricDisplay.innerHTML = `正在唱 (${state.tapCurrentIdx + 1}/${state.tapLyricsLines.length})：<span class="text-white underline">${state.tapLyricsLines[state.tapCurrentIdx]}</span>`;
+            } else {
+                currentTapLyricDisplay.textContent = '🎉 錄製完畢！';
+            }
+        }
+
+        function parseCleanLinesOnly(rawText) {
+            const lines = rawText.replace(/
+/g, '
+').split('
+').map(l => l.trim());
+            const clean = [];
+            for (let i = 0; i < lines.length; i++) {
+                const l = lines[i];
+                if (!l) continue;
+                if (/^\d+$/.test(l) && lines[i+1] && /\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->/.test(lines[i+1])) continue;
+                if (/\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/.test(l)) continue;
+                if (/^\[\d{1,2}:\d{2}(?:[.,]\d{1,3})?\]/.test(l)) {
+                    const txt = l.replace(/\[?\d{1,2}:\d{2}(?:[.,]\d{1,3})?\]?/g, '').trim();
+                    if (txt) clean.push(txt);
+                    continue;
+                }
+                clean.push(l);
+            }
+            return clean;
+        }
+
+        function parseAndAlignLyrics() {
+            const raw = lyricsTextarea?.value;
+            if (!raw?.trim()) { state.subtitles = []; renderSubtitleList(); return; }
+            const totalDur = state.audioDuration || 30;
+            const lines = raw.replace(/
+/g, '
+').split('
+').map(l => l.trim()).filter(Boolean);
+            
+            const isSrt = lines.some(l => /\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/.test(l));
+            if (isSrt) {
+                const subs = [];
+                const blocks = raw.replace(/
+/g, '
+').split(/
+\s*
+/);
+                for (const block of blocks) {
+                    const bLines = block.split('
+').map(s => s.trim()).filter(Boolean);
+                    const timeLineIdx = bLines.findIndex(l => /(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{3})/.test(l));
+                    if (timeLineIdx !== -1) {
+                        const m = bLines[timeLineIdx].match(/(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{3})/);
+                        const start = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]) + parseInt(m[4])/1000;
+                        const end = parseInt(m[5])*3600 + parseInt(m[6])*60 + parseInt(m[7]) + parseInt(m[8])/1000;
+                        const textLines = bLines.slice(timeLineIdx + 1).filter(t => !/\d{2}:\d{2}:\d{2}/.test(t) && !/^\d+$/.test(t)).map(t => t.replace(/\[?\d{1,2}:\d{2}(?:[.,]\d{1,3})?\]?/g, '').trim()).filter(Boolean);
+                        if (textLines.length) subs.push({ start, end, text: textLines.join(' ') });
+                    }
+                }
+                state.subtitles = subs;
+                state.totalTimeShift = 0;
+                if (timeShiftValueLabel) timeShiftValueLabel.textContent = '+0.0 秒';
+                renderSubtitleList();
+                return;
+            }
+
+            const cleanPureLines = parseCleanLinesOnly(raw);
+            if (!cleanPureLines.length) { state.subtitles = []; renderSubtitleList(); return; }
+            const weights = cleanPureLines.map(l => Math.max(2, l.length));
+            const totalWeight = weights.reduce((a, b) => a + b, 0) || 1;
+            let accTime = 0;
+            state.subtitles = cleanPureLines.map((text, i) => {
+                const dur = (weights[i] / totalWeight) * totalDur;
+                const start = Number(accTime.toFixed(2));
+                accTime += dur;
+                const end = Number((i === cleanPureLines.length - 1 ? totalDur : accTime).toFixed(2));
+                return { start, end, text };
+            });
+            state.totalTimeShift = 0;
+            if (timeShiftValueLabel) timeShiftValueLabel.textContent = '+0.0 秒';
+            renderSubtitleList();
+        }
+
+        parseLyricsBtn?.addEventListener('click', parseAndAlignLyrics);
+
+        window.shiftAllSubtitleTime = function(deltaSec) {
+            if (!state.subtitles.length) { alert('無字幕可調整！'); return; }
+            state.totalTimeShift += deltaSec;
+            if (timeShiftValueLabel) timeShiftValueLabel.textContent = `${state.totalTimeShift >= 0 ? '+' : ''}${state.totalTimeShift.toFixed(1)} 秒`;
+            state.subtitles.forEach(sub => {
+                sub.start = Math.max(0, sub.start + deltaSec);
+                sub.end = Math.max(sub.start + 0.2, sub.end + deltaSec);
+            });
+            renderSubtitleList();
+        };
+
+        window.resetAllSubtitleTime = function() {
+            state.totalTimeShift = 0;
+            if (timeShiftValueLabel) timeShiftValueLabel.textContent = '+0.0 秒';
+            parseAndAlignLyrics();
+        };
+
+        function renderSubtitleList() {
+            if (subtitleCountBadge) subtitleCountBadge.textContent = `${state.subtitles.length} 句字幕`;
+            if (!subtitleListContainer) return;
+            if (!state.subtitles.length) {
+                subtitleListContainer.innerHTML = `<div class="text-center text-slate-500 py-20 text-sm">尚未建立字幕清單</div>`;
+                return;
+            }
+            subtitleListContainer.innerHTML = state.subtitles.map((sub, idx) => `
+                <div onclick="jumpToSubtitleTime(${sub.start})" class="group bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 cursor-pointer transition">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-950 text-emerald-400 font-bold">#${idx + 1}</span>
+                        <input type="text" value="${sub.text.replace(/"/g, '&quot;')}" onclick="event.stopPropagation()" onchange="updateSubItem(${idx}, 'text', this.value)" class="bg-transparent text-sm text-white font-semibold w-full outline-none">
+                    </div>
+                    <div class="flex items-center gap-1.5 text-xs font-mono" onclick="event.stopPropagation()">
+                        <input type="number" step="0.1" value="${sub.start}" onchange="updateSubItem(${idx}, 'start', this.value)" class="w-16 bg-slate-950 border border-slate-700 rounded px-1 text-emerald-300 text-center">
+                        <span>~</span>
+                        <input type="number" step="0.1" value="${sub.end}" onchange="updateSubItem(${idx}, 'end', this.value)" class="w-16 bg-slate-950 border border-slate-700 rounded px-1 text-purple-300 text-center">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.updateSubItem = function(idx, field, val) {
+            if (!state.subtitles[idx]) return;
+            if (field === 'text') state.subtitles[idx].text = val.trim();
+            else state.subtitles[idx][field] = Math.max(0, parseFloat(val) || 0);
+        };
+
+        window.jumpToSubtitleTime = function(sec) {
+            mainAudio.currentTime = sec;
+            updateTimeUI(sec);
+            drawPreviewFrame(sec);
+        };
+
+        subtitleFileInput?.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            lyricsTextarea.value = await file.text();
+            parseAndAlignLyrics();
+            subtitleFileInput.value = '';
+        });
+
+        exportSrtBtn?.addEventListener('click', () => {
+            if (!state.subtitles.length) parseAndAlignLyrics();
+            if (!state.subtitles.length) { alert('無字幕可匯出！'); return; }
+            const srt = state.subtitles.map((s, i) => `${i + 1}
+${formatSrtTime(s.start)} --> ${formatSrtTime(s.end)}
+${s.text}
+`).join('
+');
+            const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${state.exportBaseName}.srt`; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        exportLrcBtn?.addEventListener('click', () => {
+            if (!state.subtitles.length) parseAndAlignLyrics();
+            if (!state.subtitles.length) { alert('無歌詞可匯出！'); return; }
+            const lrc = state.subtitles.map(s => `${formatLrcTime(s.start)}${s.text}`).join('
+');
+            const blob = new Blob([lrc], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${state.exportBaseName}.lrc`; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        document.getElementById('subPosY')?.addEventListener('change', (e) => { state.subStyle.posY = parseFloat(e.target.value); drawPreviewFrame(mainAudio.currentTime || 0); });
+        document.getElementById('subFontFamily')?.addEventListener('change', (e) => { state.subStyle.fontFamily = e.target.value; drawPreviewFrame(mainAudio.currentTime || 0); });
+        document.getElementById('subFontSize')?.addEventListener('input', (e) => {
+            state.subStyle.fontSize = parseInt(e.target.value, 10);
+            const el = document.getElementById('subFontSizeVal'); if (el) el.textContent = `${state.subStyle.fontSize}px`;
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+        document.getElementById('subOutlineWidth')?.addEventListener('input', (e) => {
+            state.subStyle.outlineWidth = parseInt(e.target.value, 10);
+            const el = document.getElementById('subOutlineWidthVal'); if (el) el.textContent = `${state.subStyle.outlineWidth}px`;
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        });
+        window.setSubtitleColor = function(hex) {
+            state.subStyle.color = hex.toUpperCase();
+            const col = document.getElementById('subCustomColor'); if (col) col.value = state.subStyle.color;
+            const lbl = document.getElementById('subColorHexLabel'); if (lbl) lbl.textContent = state.subStyle.color;
+            drawPreviewFrame(mainAudio.currentTime || 0);
+        };
+        document.getElementById('subCustomColor')?.addEventListener('input', (e) => setSubtitleColor(e.target.value));
+        document.getElementById('volumeBoostSlider')?.addEventListener('input', (e) => {
+            state.volumeBoost = parseInt(e.target.value, 10) / 100;
+            const val = document.getElementById('volumeBoostVal'); if (val) val.textContent = `${e.target.value}%`;
+            if (gainNode) gainNode.gain.value = state.volumeBoost;
+        });
+
+        function renderFrameToCanvas(ctx, timeSec, totalDuration) {
+            const W = 1920, H = 1080;
+            ctx.fillStyle = '#050811'; ctx.fillRect(0, 0, W, H);
+            const dur = Math.max(0.1, totalDuration || state.audioDuration || 30);
+
+            if (state.photos.length > 0) {
+                const segDur = dur / state.photos.length;
+                const idx = Math.min(state.photos.length - 1, Math.floor(timeSec / segDur));
+                const localProgress = Math.max(0, Math.min(1, (timeSec - idx * segDur) / segDur));
+                const photoObj = state.photos[idx];
+
+                if (photoObj?.img) {
+                    const img = photoObj.img, imgRatio = img.width / img.height, canvasRatio = W / H;
+                    let baseW = imgRatio > canvasRatio ? H * imgRatio : W;
+                    let baseH = imgRatio > canvasRatio ? H : W / imgRatio;
+                    let scale = 1.0, tx = 0, ty = 0, mode = state.kenBurnsMode;
+                    if (mode === 'smart') {
+                        scale = idx % 2 === 0 ? 1.0 + 0.16 * localProgress : 1.16 - 0.16 * localProgress;
+                        tx = idx % 2 === 0 ? -25 * localProgress : 25 * localProgress;
+                    } else if (mode === 'zoomIn') scale = 1.0 + 0.18 * localProgress;
+                    else if (mode === 'zoomOut') scale = 1.18 - 0.18 * localProgress;
+                    else if (mode === 'pan') { scale = 1.12; tx = (idx % 2 === 0 ? 1 : -1) * (-55 + 110 * localProgress); }
+
+                    if (state.smartFaceFocus) ty -= H * 0.04;
+                    ctx.save(); ctx.translate(W / 2 + tx, H / 2 + ty); ctx.scale(scale, scale);
+                    ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH); ctx.restore();
+                }
+            } else {
+                const grad = ctx.createLinearGradient(0, 0, W, H);
+                grad.addColorStop(0, '#0f172a'); grad.addColorStop(1, '#064e3b');
+                ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+                ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.font = "bold 44px sans-serif";
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('AI 照片音樂 MV 工作站 · 1920×1080 預覽畫布', W / 2, H / 2);
+            }
+
+            const activeSub = state.subtitles.find(s => timeSec >= s.start && timeSec <= s.end);
+            if (activeSub?.text) {
+                const { posY, fontFamily, fontSize, outlineWidth, color } = state.subStyle;
+                ctx.save(); ctx.font = `900 ${fontSize}px ${fontFamily}`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                const x = W / 2, y = H * posY;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.85)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
+                if (outlineWidth > 0) { ctx.lineWidth = outlineWidth * 2; ctx.strokeStyle = '#000000'; ctx.strokeText(activeSub.text, x, y); }
+                ctx.fillStyle = color; ctx.fillText(activeSub.text, x, y); ctx.restore();
+            }
+        }
+
+        function drawPreviewFrame(timeSec) { renderFrameToCanvas(mvCtx, timeSec, state.audioDuration || 30); }
+
+        document.getElementById('confirmFilenameBtn')?.addEventListener('click', () => {
+            const val = filenameModalInput?.value.trim().replace(/[\/:*?"<>|]/g, '_');
+            if (val) { state.exportBaseName = val; if (currentFilenameLabel) currentFilenameLabel.textContent = state.exportBaseName; }
+            document.getElementById('filenameModal')?.classList.add('hidden');
+        });
+
+        startRenderBtn?.addEventListener('click', async () => {
+            if (state.isRendering) return;
+            if (!window.VideoEncoder || !window.AudioEncoder) { alert('您的瀏覽器不支援 WebCodecs API！'); return; }
+            if (!mainAudio.paused) mainAudio.pause();
+
+            state.isRendering = true; state.renderedMp4Buffer = null;
+            manualDownloadBtn?.classList.add('hidden');
+            startRenderBtn.disabled = true; startRenderBtn.classList.add('opacity-60');
+            renderProgressBox?.classList.remove('hidden');
+            renderProgressBar.style.width = '0%'; renderPercentText.textContent = '0%';
+            renderStatusText.textContent = '正在初始化算圖引擎...';
+
+            try {
+                const FPS = 30, W = 1920, H = 1080;
+                const totalDuration = state.audioDuration || 10;
+                const totalFrames = Math.max(1, Math.ceil(totalDuration * FPS));
+                const sampleRate = state.audioBuffer ? state.audioBuffer.sampleRate : 48000;
+
+                const muxer = new Mp4Muxer.Muxer({
+                    target: new Mp4Muxer.ArrayBufferTarget(),
+                    video: { codec: 'avc', width: W, height: H },
+                    audio: { codec: 'aac', numberOfChannels: 2, sampleRate: sampleRate },
+                    fastStart: 'in-memory'
+                });
+
+                const videoEncoder = new VideoEncoder({
+                    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+                    error: (err) => console.error(err)
+                });
+                videoEncoder.configure({ codec: 'avc1.640028', width: W, height: H, bitrate: 8_000_000, framerate: FPS });
+
+                const audioEncoder = new AudioEncoder({
+                    output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+                    error: (err) => console.error(err)
+                });
+                audioEncoder.configure({ codec: 'mp4a.40.2', numberOfChannels: 2, sampleRate: sampleRate, bitrate: 192_000 });
+
+                const totalAudioSamples = Math.floor(totalDuration * sampleRate);
+                const leftIn = state.audioBuffer ? state.audioBuffer.getChannelData(0) : new Float32Array(totalAudioSamples);
+                const rightIn = state.audioBuffer && state.audioBuffer.numberOfChannels > 1 ? state.audioBuffer.getChannelData(1) : leftIn;
+                const boost = state.volumeBoost;
+
+                for (let offset = 0; offset < totalAudioSamples; offset += sampleRate) {
+                    const len = Math.min(sampleRate, totalAudioSamples - offset);
+                    const planar = new Float32Array(len * 2);
+                    for (let i = 0; i < len; i++) {
+                        let l = (leftIn[offset + i] || 0) * boost, r = (rightIn[offset + i] || 0) * boost;
+                        planar[i] = boost > 1.0 ? Math.tanh(l) : Math.max(-1, Math.min(1, l));
+                        planar[len + i] = boost > 1.0 ? Math.tanh(r) : Math.max(-1, Math.min(1, r));
+                    }
+                    const audioData = new AudioData({ format: 'f32-planar', sampleRate, numberOfFrames: len, numberOfChannels: 2, timestamp: Math.round((offset / sampleRate) * 1_000_000), data: planar });
+                    audioEncoder.encode(audioData); audioData.close();
+                }
+
+                for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
+                    renderFrameToCanvas(mvCtx, frameIdx / FPS, totalDuration);
+                    const frame = new VideoFrame(mvCanvas, { timestamp: Math.round((frameIdx / FPS) * 1_000_000), duration: Math.round((1 / FPS) * 1_000_000) });
+                    videoEncoder.encode(frame, { keyFrame: frameIdx % 30 === 0 }); frame.close();
+                    if (videoEncoder.encodeQueueSize > 15) await videoEncoder.flush();
+                    if (frameIdx % 5 === 0 || frameIdx === totalFrames - 1) {
+                        const pct = Math.round(((frameIdx + 1) / totalFrames) * 100);
+                        renderProgressBar.style.width = `${pct}%`; renderPercentText.textContent = `${pct}%`;
+                        renderStatusText.textContent = `算圖中：${pct}%`;
+                        await new Promise(r => setTimeout(r, 0));
+                    }
+                }
+
+                await videoEncoder.flush(); await audioEncoder.flush();
+                videoEncoder.close(); audioEncoder.close();
+                muxer.finalize();
+                state.renderedMp4Buffer = muxer.target.buffer;
+
+                renderStatusText.textContent = '✅ 合成完畢！請點擊下方下載。';
+                manualDownloadBtn?.classList.remove('hidden');
+            } catch (err) {
+                console.error(err);
+                renderStatusText.textContent = `❌ 錯誤：${err.message}`;
+            } finally {
+                state.isRendering = false;
+                startRenderBtn.disabled = false; startRenderBtn.classList.remove('opacity-60');
+            }
+        });
+
+        manualDownloadBtn?.addEventListener('click', () => {
+            if (!state.renderedMp4Buffer) { alert('請先合成！'); return; }
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+            const blob = new Blob([state.renderedMp4Buffer], { type: 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `${state.exportBaseName}_${timeStr}.mp4`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 3000);
+        });
+
+        drawPreviewFrame(0);
+    </script>
+</body>
+</html>

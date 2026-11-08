@@ -161,8 +161,8 @@
         </div>
 
         <!-- Preview Canvas Wrapper -->
-        <div class="w-full bg-black rounded-xl overflow-hidden flex items-center justify-center relative border border-slate-800" style="min-height: 240px;">
-          <canvas id="previewCanvas" class="max-w-full max-h-[52vh] w-auto h-auto block"></canvas>
+        <div class="w-full bg-black rounded-xl overflow-hidden flex items-center justify-center relative border border-slate-800" style="min-height: 220px;">
+          <canvas id="previewCanvas" class="max-w-full max-h-[48vh] w-auto h-auto block"></canvas>
         </div>
 
         <!-- Touch & Pointer Scrubber -->
@@ -244,12 +244,12 @@
       </div>
     </section>
 
-    <!-- Right Column: Tabs (Media / Lyrics & Sync / Style) -->
+    <!-- Right Column: Tabs (YouTube Create-style Storyboard / Lyrics & Sync / Style) -->
     <section class="lg:col-span-5 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
       <!-- Tab Buttons -->
       <div class="grid grid-cols-3 border-b border-slate-800 bg-slate-950/50 text-xs font-semibold">
         <button data-tab="media" class="tab-btn py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 border-indigo-500 text-indigo-400 bg-slate-900">
-          <i data-lucide="images" class="w-4 h-4"></i> 照片與短片
+          <i data-lucide="images" class="w-4 h-4"></i> 軌道剪輯
         </button>
         <button data-tab="lyrics" class="tab-btn py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
           <i data-lucide="captions" class="w-4 h-4"></i> 歌詞與對時
@@ -259,40 +259,51 @@
         </button>
       </div>
 
-      <!-- Tab 1: Media -->
+      <!-- Tab 1: YouTube Create-style Storyboard & Context-Sensitive Clip Editor -->
       <div id="tab-media" class="tab-panel p-4 space-y-4 flex-1 overflow-y-auto max-h-[75vh]">
-        <div class="space-y-1.5">
-          <label class="cursor-pointer w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600/25 to-emerald-600/25 hover:from-indigo-600/35 hover:to-emerald-600/35 border border-indigo-500/40 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition">
-            <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-300"></i>
-            同時上傳照片與短片（可多選混合挑選）
+        <!-- Upload & Global Photo Duration -->
+        <div class="space-y-2">
+          <label class="cursor-pointer w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600/30 to-emerald-600/30 hover:from-indigo-600/40 hover:to-emerald-600/40 border border-indigo-500/40 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-300"></i>
+            新增照片或短片（可同時多選混合上傳）
             <input id="mediaInput" type="file" accept="image/*,video/*" multiple class="hidden" />
           </label>
-          <p class="text-[11px] text-slate-400 text-center">匯入後可使用下方每張卡片的「順序編號」或「▲ / ▼」快速調整播放順序</p>
         </div>
 
-        <!-- Global Photo Duration -->
-        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span class="text-slate-300 font-medium">統一設定所有照片長度:</span>
-          <div class="flex items-center gap-2">
-            <input id="globalPhotoDurInput" type="number" min="0.5" max="30" step="0.5" value="4" class="w-16 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-center text-white" />
-            <span class="text-slate-400">秒</span>
-            <button id="applyGlobalPhotoDurBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-medium transition">
-              套用全部
-            </button>
+        <!-- Horizontal Storyboard Track (YouTube Create style) -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-semibold text-slate-300 flex items-center gap-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+              片段軌道（點擊任一片段進行剪輯）
+            </span>
+            <span id="clipCountLabel" class="text-[11px] text-slate-400">0 個片段</span>
+          </div>
+          <div id="storyboardStrip" class="flex items-center gap-2 overflow-x-auto pb-2 pt-1 px-1 bg-slate-950/60 border border-slate-800 rounded-xl min-h-[86px]">
+            <div class="w-full text-center text-xs text-slate-500 py-5">尚未加入素材，點擊上方按鈕即可上傳</div>
           </div>
         </div>
 
-        <!-- Media List -->
-        <div id="mediaListContainer" class="space-y-2.5">
-          <div class="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
-            尚未加入任何照片或短片，請點擊上方按鈕上傳。
+        <!-- Dedicated Context-Sensitive Editor Panel (Changes for Photo vs Video!) -->
+        <div id="clipEditorPanel" class="hidden bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3 text-xs">
+          <!-- Dynamically populated depending on selected item type (photo vs video) -->
+        </div>
+
+        <!-- Global Photo Duration Helper -->
+        <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <span class="text-slate-400">統一設定所有照片長度:</span>
+          <div class="flex items-center gap-1.5">
+            <input id="globalPhotoDurInput" type="number" min="0.5" max="30" step="0.5" value="4" class="w-14 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-center text-white" />
+            <span class="text-slate-400">秒</span>
+            <button id="applyGlobalPhotoDurBtn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-medium transition">
+              套用全部照片
+            </button>
           </div>
         </div>
       </div>
 
       <!-- Tab 2: Lyrics & Tap-to-Sync -->
       <div id="tab-lyrics" class="tab-panel hidden p-4 space-y-4 flex-1 overflow-y-auto max-h-[75vh]">
-        <!-- Input / Import / Export -->
         <div class="space-y-2">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-xs font-semibold text-slate-300">歌詞內容 / SRT 檔案</span>
@@ -458,10 +469,11 @@
     // 2. App State & Utilities
     // ==========================================
     const state = {
-      aspectRatio: '16:9', // '16:9' | '9:16'
-      transition: 'fade',  // 'fade' | 'black' | 'none'
-      photoFit: 'blur',    // 'blur' | 'cover' | 'contain'
-      mediaItems: [],      // { id, type, name, url, file, imgEl?, videoEl?, width, height, duration, motion, focalPoint, originalDuration?, trimStart?, trimEnd?, speed?, volume? }
+      aspectRatio: '16:9',
+      transition: 'fade',
+      photoFit: 'blur',
+      mediaItems: [],
+      selectedClipId: null,
       music: {
         file: null,
         url: null,
@@ -472,7 +484,7 @@
         volume: 1.0,
         peaks: []
       },
-      lyrics: [],          // { id, text, start, end, yOverride }
+      lyrics: [],
       syncIndex: 0,
       style: {
         fontFamily: "'Noto Sans TC', sans-serif",
@@ -548,6 +560,15 @@
       return span / (item.speed || 1);
     }
 
+    function getClipStartTime(targetId) {
+      let acc = 0;
+      for (const item of state.mediaItems) {
+        if (item.id === targetId) return acc;
+        acc += getClipDuration(item);
+      }
+      return 0;
+    }
+
     function getTotalDuration() {
       const mediaTotal = state.mediaItems.reduce((sum, item) => sum + getClipDuration(item), 0);
       return Math.max(mediaTotal, state.music.duration || 0, 0);
@@ -559,7 +580,6 @@
 
     function resizePreviewCanvas() {
       const dims = getOutputDimensions();
-      // Preview at 50% scale for silky 60fps
       previewCanvas.width = dims.w / 2;
       previewCanvas.height = dims.h / 2;
       renderPreviewNow();
@@ -584,10 +604,9 @@
     });
 
     // ==========================================
-    // 4. Face Detection Helper (Native + Fallback)
+    // 4. Face Detection Helper
     // ==========================================
     async function detectFaceFocalPoint(imgEl) {
-      // Try native Chrome/Edge Shape Detection API if enabled
       if ('FaceDetector' in window) {
         try {
           const detector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 3 });
@@ -601,16 +620,78 @@
           }
         } catch (e) {}
       }
-      // Smart portrait default (upper-center)
       return { x: 0.5, y: 0.38 };
     }
 
     // ==========================================
-    // 5. Media Upload & List Rendering
+    // 5. Bulletproof Photo vs Video Detection & Upload
     // ==========================================
-    function isVideoFile(file) {
+    async function detectIsVideo(file) {
       if (file.type && file.type.startsWith('video/')) return true;
-      return /\.(mp4|mov|webm|m4v|avi|mkv|3gp)$/i.test(file.name || '');
+      if (file.type && file.type.startsWith('image/')) return false;
+      if (/\.(mp4|mov|webm|m4v|avi|mkv|3gp|ts)$/i.test(file.name || '')) return true;
+      if (/\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || '')) return false;
+
+      // Inspect magic bytes when Android gallery strips MIME & extension
+      try {
+        const buf = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+        const ascii = String.fromCharCode(...buf.slice(4, 12));
+        if (ascii.includes('ftyp')) return true; // MP4 / MOV / M4V
+        if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return true; // WebM / MKV
+        if (String.fromCharCode(...buf.slice(0, 4)) === 'RIFF') return true; // AVI
+      } catch (e) {}
+      return false;
+    }
+
+    async function loadAsVideoItem(file, url) {
+      const videoEl = document.createElement('video');
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      videoEl.setAttribute('playsinline', '');
+      videoEl.setAttribute('webkit-playsinline', '');
+      videoEl.preload = 'auto';
+      videoEl.src = url;
+      videoEl.load();
+
+      await new Promise((res) => {
+        const timer = setTimeout(res, 3000);
+        videoEl.onloadeddata = () => { clearTimeout(timer); res(); };
+        videoEl.onloadedmetadata = () => {
+          // Wait briefly for first frame if possible
+          setTimeout(() => { clearTimeout(timer); res(); }, 150);
+        };
+        videoEl.onerror = () => { clearTimeout(timer); res(); };
+      });
+
+      const dur = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : 5;
+      // Seek slightly to capture thumbnail frame
+      let thumbUrl = '';
+      try {
+        if (videoEl.videoWidth > 0) {
+          const tc = document.createElement('canvas');
+          tc.width = 160;
+          tc.height = 90;
+          tc.getContext('2d').drawImage(videoEl, 0, 0, 160, 90);
+          thumbUrl = tc.toDataURL('image/jpeg', 0.7);
+        }
+      } catch (e) {}
+
+      return {
+        id: uid(),
+        type: 'video',
+        name: file.name || '短片',
+        url,
+        thumbUrl,
+        file,
+        videoEl,
+        width: videoEl.videoWidth || 1920,
+        height: videoEl.videoHeight || 1080,
+        originalDuration: dur,
+        trimStart: 0,
+        trimEnd: Number(dur.toFixed(2)),
+        speed: 1.0,
+        volume: 100
+      };
     }
 
     document.getElementById('mediaInput').addEventListener('change', async (e) => {
@@ -621,60 +702,52 @@
 
       for (const file of files) {
         const url = URL.createObjectURL(file);
-        if (isVideoFile(file)) {
-          const videoEl = document.createElement('video');
-          videoEl.src = url;
-          videoEl.muted = true;
-          videoEl.playsInline = true;
-          videoEl.preload = 'auto';
-          await new Promise((res) => {
-            videoEl.onloadedmetadata = res;
-            videoEl.onerror = res;
-          });
-          const dur = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : 5;
-          state.mediaItems.push({
-            id: uid(),
-            type: 'video',
-            name: file.name,
-            url,
-            file,
-            videoEl,
-            width: videoEl.videoWidth || 1920,
-            height: videoEl.videoHeight || 1080,
-            originalDuration: dur,
-            trimStart: 0,
-            trimEnd: Number(dur.toFixed(2)),
-            speed: 1.0,
-            volume: 100
-          });
+        const definitelyVideo = await detectIsVideo(file);
+
+        if (definitelyVideo) {
+          const item = await loadAsVideoItem(file, url);
+          state.mediaItems.push(item);
+          if (!state.selectedClipId) state.selectedClipId = item.id;
           videoCount++;
         } else {
+          // Try loading as Image; if Image fails (e.g. mislabeled video), fall back to Video!
           const imgEl = new Image();
-          await new Promise((res) => {
-            imgEl.onload = res;
-            imgEl.onerror = res;
+          const imgOk = await new Promise((res) => {
+            imgEl.onload = () => res(true);
+            imgEl.onerror = () => res(false);
             imgEl.src = url;
           });
-          const focalPoint = await detectFaceFocalPoint(imgEl);
-          const defaultDur = parseFloat(document.getElementById('globalPhotoDurInput').value) || 4;
-          state.mediaItems.push({
-            id: uid(),
-            type: 'photo',
-            name: file.name,
-            url,
-            file,
-            imgEl,
-            width: imgEl.naturalWidth || 1920,
-            height: imgEl.naturalHeight || 1080,
-            duration: defaultDur,
-            motion: 'face-zoom',
-            focalPoint
-          });
-          photoCount++;
+
+          if (imgOk && imgEl.naturalWidth > 0) {
+            const focalPoint = await detectFaceFocalPoint(imgEl);
+            const defaultDur = parseFloat(document.getElementById('globalPhotoDurInput').value) || 4;
+            const item = {
+              id: uid(),
+              type: 'photo',
+              name: file.name || '照片',
+              url,
+              thumbUrl: url,
+              file,
+              imgEl,
+              width: imgEl.naturalWidth,
+              height: imgEl.naturalHeight,
+              duration: defaultDur,
+              motion: 'face-zoom',
+              focalPoint
+            };
+            state.mediaItems.push(item);
+            if (!state.selectedClipId) state.selectedClipId = item.id;
+            photoCount++;
+          } else {
+            const item = await loadAsVideoItem(file, url);
+            state.mediaItems.push(item);
+            if (!state.selectedClipId) state.selectedClipId = item.id;
+            videoCount++;
+          }
         }
       }
       e.target.value = '';
-      renderMediaList();
+      renderStoryboard();
       updateTimelineUI();
       renderPreviewNow();
       showToast(`已加入 ${photoCount} 張照片、${videoCount} 段短片`, 'success');
@@ -685,142 +758,234 @@
       state.mediaItems.forEach(item => {
         if (item.type === 'photo') item.duration = val;
       });
-      renderMediaList();
+      renderStoryboard();
       updateTimelineUI();
       renderPreviewNow();
       showToast(`已將所有照片設為 ${val} 秒`, 'success');
     });
 
-    function renderMediaList() {
-      const container = document.getElementById('mediaListContainer');
+    // ==========================================
+    // 6. YouTube Create-Style Storyboard & Dedicated Editor
+    // ==========================================
+    function renderStoryboard() {
+      const strip = document.getElementById('storyboardStrip');
+      const countLabel = document.getElementById('clipCountLabel');
+      countLabel.textContent = `${state.mediaItems.length} 個片段`;
+
       if (state.mediaItems.length === 0) {
-        container.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">尚未加入任何照片或短片，請點擊上方按鈕上傳。</div>`;
+        state.selectedClipId = null;
+        strip.innerHTML = `<div class="w-full text-center text-xs text-slate-500 py-5">尚未加入素材，點擊上方按鈕即可上傳</div>`;
+        document.getElementById('clipEditorPanel').classList.add('hidden');
         return;
       }
 
-      container.innerHTML = state.mediaItems.map((item, idx) => {
+      if (!state.mediaItems.some(m => m.id === state.selectedClipId)) {
+        state.selectedClipId = state.mediaItems[0].id;
+      }
+
+      strip.innerHTML = state.mediaItems.map((item, idx) => {
+        const isSelected = item.id === state.selectedClipId;
         const dur = getClipDuration(item).toFixed(1);
-        const orderOptions = state.mediaItems.map((_, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>#${i + 1}</option>`).join('');
-        const moveBtns = `
-          <select data-action="reorder" data-id="${item.id}" class="media-reorder bg-slate-900 border border-slate-700 text-indigo-300 font-mono text-[11px] rounded px-1.5 py-1" title="直接指定順序">
-            ${orderOptions}
-          </select>
-          <button data-action="up" data-id="${item.id}" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === 0 ? 'disabled' : ''} title="上移">
-            <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
-          </button>
-          <button data-action="down" data-id="${item.id}" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === state.mediaItems.length - 1 ? 'disabled' : ''} title="下移">
-            <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
-          </button>
-          <button data-action="delete" data-id="${item.id}" class="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400" title="刪除">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        const isVideo = item.type === 'video';
+        const thumbHtml = item.thumbUrl
+          ? `<img src="${item.thumbUrl}" class="w-full h-full object-cover pointer-events-none" />`
+          : `<div class="w-full h-full bg-slate-800 flex items-center justify-center text-emerald-400"><i data-lucide="film" class="w-5 h-5"></i></div>`;
+
+        return `
+          <button data-select-id="${item.id}" class="clip-tile relative shrink-0 w-24 h-16 rounded-xl overflow-hidden border-2 transition ${isSelected ? 'border-indigo-400 ring-2 ring-indigo-500/40 scale-[1.02]' : 'border-slate-800 hover:border-slate-600'}">
+            ${thumbHtml}
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none"></div>
+            <span class="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-mono font-bold text-white">#${idx + 1}</span>
+            <span class="absolute top-1 right-1 px-1 py-0.5 rounded text-[9px] font-bold ${isVideo ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white'}">
+              ${isVideo ? '短片' : '照片'}
+            </span>
+            <span class="absolute bottom-1 right-1 text-[10px] font-mono text-slate-200">${dur}s</span>
           </button>
         `;
-
-        if (item.type === 'photo') {
-          return `
-            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2.5 text-xs">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <img src="${item.url}" class="w-10 h-10 rounded-lg object-cover bg-slate-900 shrink-0" />
-                  <div class="min-w-0">
-                    <p class="font-semibold text-slate-200 truncate">${idx + 1}. ${item.name}</p>
-                    <p class="text-[11px] text-indigo-400">照片 · ${dur} 秒</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">${moveBtns}</div>
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">運鏡方式</label>
-                  <select data-field="motion" data-id="${item.id}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200">
-                    <option value="face-zoom" ${item.motion === 'face-zoom' ? 'selected' : ''}>聚焦人臉縮放平移</option>
-                    <option value="zoom-in" ${item.motion === 'zoom-in' ? 'selected' : ''}>全景微幅拉近 (Zoom In)</option>
-                    <option value="zoom-out" ${item.motion === 'zoom-out' ? 'selected' : ''}>全景微幅拉遠 (Zoom Out)</option>
-                    <option value="pan-left" ${item.motion === 'pan-left' ? 'selected' : ''}>由右向左平移</option>
-                    <option value="pan-right" ${item.motion === 'pan-right' ? 'selected' : ''}>由左向右平移</option>
-                    <option value="static" ${item.motion === 'static' ? 'selected' : ''}>靜止畫面</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">顯示秒數</label>
-                  <div class="flex items-center gap-1">
-                    <input data-field="duration" data-id="${item.id}" type="number" min="0.5" max="60" step="0.5" value="${item.duration}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200" />
-                    <button data-action="focal" data-id="${item.id}" class="px-2 py-1 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 shrink-0" title="手動設定人臉焦點">
-                      焦點
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          `;
-        } else {
-          return `
-            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-2.5 text-xs">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0">
-                  <div class="w-10 h-10 rounded-lg bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400 shrink-0">
-                    <i data-lucide="film" class="w-5 h-5"></i>
-                  </div>
-                  <div class="min-w-0">
-                    <p class="font-semibold text-slate-200 truncate">${idx + 1}. ${item.name}</p>
-                    <p class="text-[11px] text-emerald-400">短片 · 輸出 ${dur} 秒 (原長 ${item.originalDuration.toFixed(1)}s)</p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-1 shrink-0">${moveBtns}</div>
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">起點 (秒)</label>
-                  <input data-field="trimStart" data-id="${item.id}" type="number" min="0" max="${item.originalDuration}" step="0.1" value="${item.trimStart}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200" />
-                </div>
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">終點 (秒)</label>
-                  <input data-field="trimEnd" data-id="${item.id}" type="number" min="0.2" max="${item.originalDuration}" step="0.1" value="${item.trimEnd}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-slate-200" />
-                </div>
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">播放速度: ${item.speed}x</label>
-                  <input data-field="speed" data-id="${item.id}" type="range" min="0.25" max="4" step="0.25" value="${item.speed}" class="media-field w-full" />
-                </div>
-                <div>
-                  <label class="text-[11px] text-slate-400 block mb-1">原音音量: ${item.volume}%</label>
-                  <input data-field="volume" data-id="${item.id}" type="range" min="0" max="200" step="10" value="${item.volume}" class="media-field w-full" />
-                </div>
-              </div>
-            </div>
-          `;
-        }
       }).join('');
 
+      renderSelectedClipEditor();
       lucide.createIcons();
     }
 
-    document.getElementById('mediaListContainer').addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-action]');
-      if (!btn) return;
-      const { action, id } = btn.dataset;
-      const idx = state.mediaItems.findIndex(m => m.id === id);
-      if (idx === -1) return;
+    function renderSelectedClipEditor() {
+      const panel = document.getElementById('clipEditorPanel');
+      const idx = state.mediaItems.findIndex(m => m.id === state.selectedClipId);
+      if (idx === -1) {
+        panel.classList.add('hidden');
+        return;
+      }
+      const item = state.mediaItems[idx];
+      panel.classList.remove('hidden');
 
-      if (action === 'up' && idx > 0) {
-        [state.mediaItems[idx - 1], state.mediaItems[idx]] = [state.mediaItems[idx], state.mediaItems[idx - 1]];
-        renderMediaList();
-        renderPreviewNow();
-      } else if (action === 'down' && idx < state.mediaItems.length - 1) {
-        [state.mediaItems[idx], state.mediaItems[idx + 1]] = [state.mediaItems[idx + 1], state.mediaItems[idx]];
-        renderMediaList();
-        renderPreviewNow();
-      } else if (action === 'delete') {
-        URL.revokeObjectURL(state.mediaItems[idx].url);
-        state.mediaItems.splice(idx, 1);
-        renderMediaList();
-        updateTimelineUI();
-        renderPreviewNow();
-      } else if (action === 'focal') {
-        openFocalModal(state.mediaItems[idx]);
+      const orderOptions = state.mediaItems.map((_, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>第 ${i + 1} 順位</option>`).join('');
+      const headerHtml = `
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${item.type === 'video' ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40' : 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/40'}">
+              ${item.type === 'video' ? '🎬 短片剪輯工作列' : '📷 照片運鏡工作列'}
+            </span>
+            <span class="font-semibold text-slate-200 truncate max-w-[140px]">${item.name}</span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <select data-action="reorder" data-id="${item.id}" class="media-reorder bg-slate-900 border border-slate-700 text-indigo-300 text-[11px] rounded-lg px-1.5 py-1">
+              ${orderOptions}
+            </select>
+            <button data-action="up" data-id="${item.id}" class="clip-action-btn p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === 0 ? 'disabled' : ''} title="往前移">
+              <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+            </button>
+            <button data-action="down" data-id="${item.id}" class="clip-action-btn p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === state.mediaItems.length - 1 ? 'disabled' : ''} title="往後移">
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
+            <button data-action="delete" data-id="${item.id}" class="clip-action-btn p-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-400" title="刪除此片段">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      `;
+
+      if (item.type === 'photo') {
+        panel.innerHTML = headerHtml + `
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label class="text-[11px] text-slate-400 block mb-1">照片呈現／運鏡方式</label>
+              <select data-field="motion" data-id="${item.id}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-slate-200">
+                <option value="face-zoom" ${item.motion === 'face-zoom' ? 'selected' : ''}>聚焦人臉自動縮放平移</option>
+                <option value="zoom-in" ${item.motion === 'zoom-in' ? 'selected' : ''}>全景微幅鏡頭拉近 (Zoom In)</option>
+                <option value="zoom-out" ${item.motion === 'zoom-out' ? 'selected' : ''}>全景微幅鏡頭拉遠 (Zoom Out)</option>
+                <option value="pan-left" ${item.motion === 'pan-left' ? 'selected' : ''}>由右向左平移</option>
+                <option value="pan-right" ${item.motion === 'pan-right' ? 'selected' : ''}>由左向右平移</option>
+                <option value="static" ${item.motion === 'static' ? 'selected' : ''}>靜止畫面</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-400 block mb-1">顯示時間長度 (秒) & 焦點</label>
+              <div class="flex items-center gap-2">
+                <input data-field="duration" data-id="${item.id}" type="number" min="0.5" max="60" step="0.5" value="${item.duration}" class="media-field w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-2 text-slate-200" />
+                <button data-action="focal" data-id="${item.id}" class="clip-action-btn px-3 py-2 rounded-xl bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-300 font-semibold shrink-0">
+                  設定焦點
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        const outDur = getClipDuration(item).toFixed(1);
+        panel.innerHTML = headerHtml + `
+          <div class="space-y-3 pt-1">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/70 px-2.5 py-1.5 rounded-lg">
+              <span>原始長度: ${item.originalDuration.toFixed(1)}s</span>
+              <span class="text-emerald-400 font-semibold">剪裁後輸出長度: ${outDur}s</span>
+            </div>
+
+            <!-- Trim Start & End Sliders -->
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-400">剪裁起點</span>
+                  <span id="trimStartLabel" class="font-mono text-emerald-400">${item.trimStart.toFixed(1)}s</span>
+                </div>
+                <input data-field="trimStart" data-id="${item.id}" type="range" min="0" max="${Math.max(0.2, item.originalDuration - 0.2).toFixed(2)}" step="0.1" value="${item.trimStart}" class="media-field w-full" />
+              </div>
+              <div class="space-y-1">
+                <div class="flex justify-between text-[11px]">
+                  <span class="text-slate-400">剪裁終點</span>
+                  <span id="trimEndLabel" class="font-mono text-emerald-400">${item.trimEnd.toFixed(1)}s</span>
+                </div>
+                <input data-field="trimEnd" data-id="${item.id}" type="range" min="0.2" max="${item.originalDuration.toFixed(2)}" step="0.1" value="${item.trimEnd}" class="media-field w-full" />
+              </div>
+            </div>
+
+            <!-- Speed Quick Buttons + Slider -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">播放速度</span>
+                <div class="flex items-center gap-1">
+                  ${[0.5, 1.0, 1.5, 2.0].map(sp => `<button data-speed="${sp}" data-id="${item.id}" class="speed-preset px-2 py-0.5 rounded ${item.speed === sp ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}">${sp}x</button>`).join('')}
+                </div>
+              </div>
+              <input data-field="speed" data-id="${item.id}" type="range" min="0.25" max="4" step="0.25" value="${item.speed}" class="media-field w-full" />
+            </div>
+
+            <!-- Volume Quick Mute + Slider -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">短片原音音量: <strong class="text-white">${item.volume}%</strong></span>
+                <button data-mute-id="${item.id}" class="mute-clip-btn px-2 py-0.5 rounded ${item.volume === 0 ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-300'}">
+                  ${item.volume === 0 ? '已靜音' : '一鍵靜音'}
+                </button>
+              </div>
+              <input data-field="volume" data-id="${item.id}" type="range" min="0" max="200" step="10" value="${item.volume}" class="media-field w-full" />
+            </div>
+          </div>
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    document.getElementById('storyboardStrip').addEventListener('click', (e) => {
+      const tile = e.target.closest('.clip-tile');
+      if (!tile) return;
+      state.selectedClipId = tile.dataset.selectId;
+      renderStoryboard();
+      // Jump preview to the start of the selected clip so user sees it immediately
+      if (!state.playback.isPlaying) {
+        seekTo(getClipStartTime(state.selectedClipId) + 0.05);
       }
     });
 
-    document.getElementById('mediaListContainer').addEventListener('change', (e) => {
+    document.getElementById('clipEditorPanel').addEventListener('click', (e) => {
+      const actionBtn = e.target.closest('.clip-action-btn');
+      if (actionBtn) {
+        const { action, id } = actionBtn.dataset;
+        const idx = state.mediaItems.findIndex(m => m.id === id);
+        if (idx === -1) return;
+
+        if (action === 'up' && idx > 0) {
+          [state.mediaItems[idx - 1], state.mediaItems[idx]] = [state.mediaItems[idx], state.mediaItems[idx - 1]];
+          renderStoryboard();
+          renderPreviewNow();
+        } else if (action === 'down' && idx < state.mediaItems.length - 1) {
+          [state.mediaItems[idx], state.mediaItems[idx + 1]] = [state.mediaItems[idx + 1], state.mediaItems[idx]];
+          renderStoryboard();
+          renderPreviewNow();
+        } else if (action === 'delete') {
+          URL.revokeObjectURL(state.mediaItems[idx].url);
+          state.mediaItems.splice(idx, 1);
+          state.selectedClipId = state.mediaItems[Math.min(idx, state.mediaItems.length - 1)]?.id || null;
+          renderStoryboard();
+          updateTimelineUI();
+          renderPreviewNow();
+        } else if (action === 'focal') {
+          openFocalModal(state.mediaItems[idx]);
+        }
+        return;
+      }
+
+      const speedBtn = e.target.closest('.speed-preset');
+      if (speedBtn) {
+        const item = state.mediaItems.find(m => m.id === speedBtn.dataset.id);
+        if (item) {
+          item.speed = parseFloat(speedBtn.dataset.speed);
+          renderStoryboard();
+          updateTimelineUI();
+          renderPreviewNow();
+        }
+        return;
+      }
+
+      const muteBtn = e.target.closest('.mute-clip-btn');
+      if (muteBtn) {
+        const item = state.mediaItems.find(m => m.id === muteBtn.dataset.muteId);
+        if (item) {
+          item.volume = item.volume === 0 ? 100 : 0;
+          renderStoryboard();
+          renderPreviewNow();
+        }
+      }
+    });
+
+    document.getElementById('clipEditorPanel').addEventListener('change', (e) => {
       const sel = e.target.closest('.media-reorder');
       if (!sel) return;
       const fromIdx = state.mediaItems.findIndex(m => m.id === sel.dataset.id);
@@ -828,27 +993,45 @@
       if (fromIdx === -1 || isNaN(toIdx) || fromIdx === toIdx) return;
       const [moved] = state.mediaItems.splice(fromIdx, 1);
       state.mediaItems.splice(toIdx, 0, moved);
-      renderMediaList();
+      renderStoryboard();
       renderPreviewNow();
     });
 
-    document.getElementById('mediaListContainer').addEventListener('input', (e) => {
+    document.getElementById('clipEditorPanel').addEventListener('input', (e) => {
       const el = e.target.closest('.media-field');
       if (!el) return;
       const item = state.mediaItems.find(m => m.id === el.dataset.id);
       if (!item) return;
       const field = el.dataset.field;
+
       if (field === 'motion') {
         item.motion = el.value;
       } else {
         let v = parseFloat(el.value);
         if (!isFinite(v)) return;
-        if (field === 'trimStart') v = Math.max(0, Math.min(v, item.trimEnd - 0.2));
-        if (field === 'trimEnd') v = Math.min(item.originalDuration, Math.max(v, item.trimStart + 0.2));
-        item[field] = v;
+        if (field === 'trimStart') {
+          v = Math.max(0, Math.min(v, item.trimEnd - 0.2));
+          item.trimStart = v;
+          if (!state.playback.isPlaying && item.videoEl) {
+            item.videoEl.currentTime = v;
+          }
+        } else if (field === 'trimEnd') {
+          v = Math.min(item.originalDuration, Math.max(v, item.trimStart + 0.2));
+          item.trimEnd = v;
+          if (!state.playback.isPlaying && item.videoEl) {
+            item.videoEl.currentTime = v;
+          }
+        } else {
+          item[field] = v;
+        }
       }
       if (el.type === 'range') {
-        renderMediaList();
+        renderSelectedClipEditor();
+        // Update badge duration in strip
+        const stripDur = document.querySelector(`.clip-tile[data-select-id="${item.id}"] span:last-child`);
+        if (stripDur) stripDur.textContent = `${getClipDuration(item).toFixed(1)}s`;
+      } else {
+        renderStoryboard();
       }
       updateTimelineUI();
       renderPreviewNow();
@@ -870,17 +1053,14 @@
       const img = document.getElementById('focalModalImg');
       const rect = img.getBoundingClientRect();
       const wrapRect = document.getElementById('focalImageWrapper').getBoundingClientRect();
-      const offsetX = rect.left - wrapRect.left;
-      const offsetY = rect.top - wrapRect.top;
-      marker.style.left = `${offsetX + fp.x * rect.width}px`;
-      marker.style.top = `${offsetY + fp.y * rect.height}px`;
+      marker.style.left = `${(rect.left - wrapRect.left) + fp.x * rect.width}px`;
+      marker.style.top = `${(rect.top - wrapRect.top) + fp.y * rect.height}px`;
     }
 
     document.getElementById('focalImageWrapper').addEventListener('click', (e) => {
       const item = state.mediaItems.find(m => m.id === state.focalEditingId);
       if (!item) return;
-      const img = document.getElementById('focalModalImg');
-      const rect = img.getBoundingClientRect();
+      const rect = document.getElementById('focalModalImg').getBoundingClientRect();
       const x = Math.min(0.95, Math.max(0.05, (e.clientX - rect.left) / rect.width));
       const y = Math.min(0.95, Math.max(0.05, (e.clientY - rect.top) / rect.height));
       item.focalPoint = { x, y };
@@ -905,7 +1085,7 @@
     });
 
     // ==========================================
-    // 6. Music Upload & Waveform Visualizer
+    // 7. Music Upload & Waveform Visualizer
     // ==========================================
     document.getElementById('musicInput').addEventListener('change', async (e) => {
       const file = e.target.files?.[0];
@@ -926,7 +1106,6 @@
         const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
         ctx.close();
 
-        // Extract waveform peaks for visualizer
         const raw = audioBuffer.getChannelData(0);
         const samples = 140;
         const blockSize = Math.floor(raw.length / samples);
@@ -994,7 +1173,7 @@
     }
 
     // ==========================================
-    // 7. Lyrics, SRT Import/Export & Tap-to-Sync
+    // 8. Lyrics, SRT Import/Export & Tap-to-Sync
     // ==========================================
     document.getElementById('loadLyricsTextBtn').addEventListener('click', () => {
       const raw = document.getElementById('lyricsPasteBox').value;
@@ -1003,7 +1182,7 @@
         showToast('請先輸入歌詞文字', 'error');
         return;
       }
-      state.lyrics = lines.map((text, i) => ({
+      state.lyrics = lines.map((text) => ({
         id: uid(),
         text,
         start: null,
@@ -1211,7 +1390,7 @@
     });
 
     // ==========================================
-    // 8. Subtitle Style & Layout Controls
+    // 9. Subtitle Style & Layout Controls
     // ==========================================
     document.getElementById('aspectRatioSelect').addEventListener('change', (e) => {
       state.aspectRatio = e.target.value;
@@ -1265,17 +1444,19 @@
     });
 
     // ==========================================
-    // 9. Core Canvas Rendering Engine (Preview & 1080p Export)
+    // 10. Core Canvas Rendering Engine
     // ==========================================
     function drawMediaItem(ctx, W, H, item, progress, alpha = 1) {
+      const src = item.type === 'photo' ? item.imgEl : item.videoEl;
+      if (!src) return;
+      if (item.type === 'video' && src.readyState < 2) return;
+
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      const src = item.type === 'photo' ? item.imgEl : item.videoEl;
-      const srcW = item.width || 1920;
-      const srcH = item.height || 1080;
+      const srcW = item.width || (item.type === 'photo' ? src.naturalWidth : src.videoWidth) || 1920;
+      const srcH = item.height || (item.type === 'photo' ? src.naturalHeight : src.videoHeight) || 1080;
 
-      // Motion transform for photos
       let scale = 1;
       let panX = 0;
       let panY = 0;
@@ -1299,7 +1480,6 @@
       }
 
       if (state.photoFit === 'blur') {
-        // Blurred background fill
         const bgScale = Math.max(W / srcW, H / srcH) * 1.1;
         const bw = srcW * bgScale;
         const bh = srcH * bgScale;
@@ -1308,7 +1488,6 @@
         ctx.drawImage(src, (W - bw) / 2, (H - bh) / 2, bw, bh);
         ctx.restore();
 
-        // Foreground contain
         const fgScale = Math.min(W / srcW, H / srcH) * scale;
         const fw = srcW * fgScale;
         const fh = srcH * fgScale;
@@ -1377,7 +1556,6 @@
         }
       }
 
-      // Draw active lyric
       const lyric = getActiveLyricAtTime(t);
       if (lyric) {
         const scaleFactor = W / (state.aspectRatio === '9:16' ? 1080 : 1920);
@@ -1426,8 +1604,13 @@
           if (t >= acc && t < acc + d) {
             const localT = t - acc;
             const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
-            if (Math.abs(item.videoEl.currentTime - targetSrcT) > 0.15) {
+            if (Math.abs(item.videoEl.currentTime - targetSrcT) > (state.playback.isPlaying ? 0.3 : 0.05)) {
               item.videoEl.currentTime = targetSrcT;
+              if (!state.playback.isPlaying) {
+                item.videoEl.onseeked = () => {
+                  renderFrameAtTime(previewCtx, previewCanvas.width, previewCanvas.height, state.playback.currentTime);
+                };
+              }
             }
             item.videoEl.playbackRate = item.speed;
             item.videoEl.muted = item.volume === 0;
@@ -1461,7 +1644,7 @@
     }
 
     // ==========================================
-    // 10. Playback & Touch Scrubbing
+    // 11. Playback & Touch Scrubbing
     // ==========================================
     function seekTo(sec) {
       const total = getTotalDuration();
@@ -1547,30 +1730,9 @@
     document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
     document.getElementById('musicPlayBtn').addEventListener('click', togglePlay);
     document.getElementById('syncPlayBtn').addEventListener('click', togglePlay);
-
-    // Visualizer waveform touch/click scrub
-    const visWrap = document.getElementById('visualizerWrap');
-    let isVisScrubbing = false;
-    function scrubFromVis(clientX) {
-      const dur = state.music.duration || getTotalDuration();
-      if (!dur) return;
-      const rect = visWrap.getBoundingClientRect();
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-      seekTo(ratio * dur);
-    }
-    visWrap.addEventListener('pointerdown', (e) => {
-      isVisScrubbing = true;
-      visWrap.setPointerCapture(e.pointerId);
-      scrubFromVis(e.clientX);
-    });
-    visWrap.addEventListener('pointermove', (e) => {
-      if (isVisScrubbing) scrubFromVis(e.clientX);
-    });
-    visWrap.addEventListener('pointerup', () => { isVisScrubbing = false; });
     document.getElementById('skipBackBtn').addEventListener('click', () => seekTo(state.playback.currentTime - 5));
     document.getElementById('skipForwardBtn').addEventListener('click', () => seekTo(state.playback.currentTime + 5));
 
-    // Touch & Pointer Scrubber
     const scrubberTrack = document.getElementById('scrubberTrack');
     function scrubFromPointer(clientX) {
       const rect = scrubberTrack.getBoundingClientRect();
@@ -1590,8 +1752,27 @@
       state.playback.isScrubbing = false;
     });
 
+    const visWrap = document.getElementById('visualizerWrap');
+    let isVisScrubbing = false;
+    function scrubFromVis(clientX) {
+      const dur = state.music.duration || getTotalDuration();
+      if (!dur) return;
+      const rect = visWrap.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      seekTo(ratio * dur);
+    }
+    visWrap.addEventListener('pointerdown', (e) => {
+      isVisScrubbing = true;
+      visWrap.setPointerCapture(e.pointerId);
+      scrubFromVis(e.clientX);
+    });
+    visWrap.addEventListener('pointermove', (e) => {
+      if (isVisScrubbing) scrubFromVis(e.clientX);
+    });
+    visWrap.addEventListener('pointerup', () => { isVisScrubbing = false; });
+
     // ==========================================
-    // 11. 1080p MP4 Export (WebCodecs + mp4-muxer)
+    // 12. 1080p MP4 Export (WebCodecs + mp4-muxer)
     // ==========================================
     document.getElementById('cancelExportBtn').addEventListener('click', () => {
       state.exportCancelled = true;
@@ -1637,7 +1818,6 @@
       const sampleRate = 48000;
 
       try {
-        // Pick supported H.264 codec
         const candidateCodecs = ['avc1.420028', 'avc1.4d002a', 'avc1.640028'];
         let chosenCodec = null;
         for (const c of candidateCodecs) {
@@ -1724,7 +1904,6 @@
           await audioEncoder.flush();
         }
 
-        // Offscreen 1080p Canvas
         const exportCanvas = document.createElement('canvas');
         exportCanvas.width = W;
         exportCanvas.height = H;
@@ -1737,7 +1916,6 @@
           }
           const t = frameIdx / FPS;
 
-          // Seek active video clip if needed
           let acc = 0;
           for (const item of state.mediaItems) {
             const d = getClipDuration(item);

@@ -38,6 +38,9 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
+  <!-- Hidden DOM Pool so Mobile Browsers Never Suspend Video Decoding -->
+  <div id="hiddenVideoPool" style="position:fixed;left:-9999px;top:-9999px;width:4px;height:4px;opacity:0.001;pointer-events:none;overflow:hidden;"></div>
+
   <!-- LINE In-App Browser Overlay -->
   <div id="lineOverlay" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
     <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
@@ -92,6 +95,18 @@
     </div>
   </div>
 
+  <!-- New Project Confirmation Modal -->
+  <div id="resetModal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
+      <h3 class="font-bold text-base text-white">確定要開新專案嗎？</h3>
+      <p class="text-xs text-slate-300 leading-relaxed">這將會清除目前的自動存檔與所有已載入的素材與歌詞。建議先點擊「儲存紀錄檔」保留設定。</p>
+      <div class="flex justify-end gap-2">
+        <button id="cancelResetBtn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200">取消</button>
+        <button id="confirmResetBtn" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white">確定清除並開新專案</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Export Progress Modal -->
   <div id="exportModal" class="hidden fixed inset-0 z-40 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -128,17 +143,32 @@
           <i data-lucide="clapperboard" class="w-5 h-5 text-white"></i>
         </div>
         <div>
-          <h1 class="text-base sm:text-lg font-bold text-white leading-tight">1080p MV 合成工作室</h1>
-          <p class="text-[11px] text-slate-400">純前端離線運算 · 照片運鏡 · 短片剪輯 · SRT 歌詞同步</p>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base sm:text-lg font-bold text-white leading-tight">1080p MV 合成工作室</h1>
+            <span id="autosaveBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">已自動存檔</span>
+          </div>
+          <p class="text-[11px] text-slate-400">純前端離線運算 · 邊做邊存檔 · SRT 歌詞同步</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap">
-        <select id="aspectRatioSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-          <option value="16:9">16:9 橫式 (1920×1080)</option>
-          <option value="9:16">9:16 直式 (1080×1920)</option>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <select id="aspectRatioSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-2 focus:outline-none">
+          <option value="16:9">16:9 橫式</option>
+          <option value="9:16">9:16 直式</option>
         </select>
-        <button id="exportBtn" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition">
+        <button id="saveRecordBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 transition" title="匯出專案紀錄檔 (.json)">
+          <i data-lucide="save" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span class="hidden sm:inline">儲存紀錄</span>
+        </button>
+        <label class="cursor-pointer px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 transition" title="讀取專案紀錄檔 (.json)">
+          <i data-lucide="folder-open" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span class="hidden sm:inline">讀取紀錄</span>
+          <input id="loadRecordInput" type="file" accept=".json,.mvproj" class="hidden" />
+        </label>
+        <button id="newProjectBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 text-xs font-medium transition" title="開新專案">
+          新專案
+        </button>
+        <button id="exportBtn" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition">
           <i data-lucide="sparkles" class="w-4 h-4"></i>
           匯出 1080p MP4
         </button>
@@ -244,9 +274,8 @@
       </div>
     </section>
 
-    <!-- Right Column: Tabs (YouTube Create-style Storyboard / Lyrics & Sync / Style) -->
+    <!-- Right Column: Tabs -->
     <section class="lg:col-span-5 flex flex-col bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-      <!-- Tab Buttons -->
       <div class="grid grid-cols-3 border-b border-slate-800 bg-slate-950/50 text-xs font-semibold">
         <button data-tab="media" class="tab-btn py-3 px-2 flex items-center justify-center gap-1.5 border-b-2 border-indigo-500 text-indigo-400 bg-slate-900">
           <i data-lucide="images" class="w-4 h-4"></i> 軌道剪輯
@@ -259,9 +288,8 @@
         </button>
       </div>
 
-      <!-- Tab 1: YouTube Create-style Storyboard & Context-Sensitive Clip Editor -->
+      <!-- Tab 1: Storyboard & Context-Sensitive Clip Editor -->
       <div id="tab-media" class="tab-panel p-4 space-y-4 flex-1 overflow-y-auto max-h-[75vh]">
-        <!-- Upload & Global Photo Duration -->
         <div class="space-y-2">
           <label class="cursor-pointer w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600/30 to-emerald-600/30 hover:from-indigo-600/40 hover:to-emerald-600/40 border border-indigo-500/40 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition">
             <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-300"></i>
@@ -270,7 +298,6 @@
           </label>
         </div>
 
-        <!-- Horizontal Storyboard Track (YouTube Create style) -->
         <div class="space-y-1.5">
           <div class="flex items-center justify-between text-xs">
             <span class="font-semibold text-slate-300 flex items-center gap-1.5">
@@ -284,12 +311,8 @@
           </div>
         </div>
 
-        <!-- Dedicated Context-Sensitive Editor Panel (Changes for Photo vs Video!) -->
-        <div id="clipEditorPanel" class="hidden bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3 text-xs">
-          <!-- Dynamically populated depending on selected item type (photo vs video) -->
-        </div>
+        <div id="clipEditorPanel" class="hidden bg-slate-950/80 border border-slate-800 rounded-2xl p-3.5 space-y-3 text-xs"></div>
 
-        <!-- Global Photo Duration Helper -->
         <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span class="text-slate-400">統一設定所有照片長度:</span>
           <div class="flex items-center gap-1.5">
@@ -323,7 +346,6 @@
           </button>
         </div>
 
-        <!-- Tap-to-Sync Console -->
         <div class="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 space-y-2.5">
           <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
@@ -354,7 +376,6 @@
           </div>
         </div>
 
-        <!-- Global Lyric Offset -->
         <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
           <span class="text-slate-300 font-medium">全部歌詞整體微調:</span>
           <div class="flex items-center gap-1">
@@ -365,7 +386,6 @@
           </div>
         </div>
 
-        <!-- Lyric Lines List -->
         <div id="lyricsListContainer" class="space-y-2"></div>
       </div>
 
@@ -439,9 +459,7 @@
     // ==========================================
     (function checkLineBrowser() {
       const ua = navigator.userAgent || '';
-      const isLine = /Line\//i.test(ua);
-      if (!isLine) return;
-
+      if (!/Line\//i.test(ua)) return;
       const overlay = document.getElementById('lineOverlay');
       overlay.classList.remove('hidden');
 
@@ -458,11 +476,8 @@
       }
 
       tryRedirect();
-
       document.getElementById('lineRetryRedirectBtn').addEventListener('click', tryRedirect);
-      document.getElementById('lineDismissBtn').addEventListener('click', () => {
-        overlay.classList.add('hidden');
-      });
+      document.getElementById('lineDismissBtn').addEventListener('click', () => overlay.classList.add('hidden'));
     })();
 
     // ==========================================
@@ -500,7 +515,8 @@
         currentTime: 0,
         rafId: null,
         lastTs: 0,
-        isScrubbing: false
+        isScrubbing: false,
+        seekLockUntil: 0
       },
       exportCancelled: false,
       focalEditingId: null
@@ -510,6 +526,7 @@
     const previewCtx = previewCanvas.getContext('2d');
     const visCanvas = document.getElementById('visualizerCanvas');
     const visCtx = visCanvas.getContext('2d');
+    const hiddenVideoPool = document.getElementById('hiddenVideoPool');
 
     function uid() {
       return Math.random().toString(36).slice(2, 10);
@@ -586,7 +603,288 @@
     }
 
     // ==========================================
-    // 3. Tabs Switching
+    // 3. IndexedDB Auto-Save & Project Record Export/Import
+    // ==========================================
+    const DB_NAME = 'MVStudioDB';
+    const STORE_NAME = 'projects';
+    let autosaveTimer = null;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        if (!('indexedDB' in window)) return reject(new Error('No IndexedDB'));
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function scheduleAutoSave() {
+      const badge = document.getElementById('autosaveBadge');
+      if (badge) badge.textContent = '儲存中...';
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(saveProjectToDB, 600);
+    }
+
+    async function saveProjectToDB() {
+      try {
+        const db = await openDB();
+        const payload = {
+          aspectRatio: state.aspectRatio,
+          transition: state.transition,
+          photoFit: state.photoFit,
+          style: state.style,
+          lyrics: state.lyrics,
+          syncIndex: state.syncIndex,
+          musicVolume: state.music.volume,
+          musicFile: state.music.file || null,
+          musicName: state.music.name || '',
+          mediaItems: state.mediaItems.map(m => ({
+            id: m.id,
+            type: m.type,
+            name: m.name,
+            file: m.file || null,
+            duration: m.duration,
+            motion: m.motion,
+            focalPoint: m.focalPoint,
+            originalDuration: m.originalDuration,
+            trimStart: m.trimStart,
+            trimEnd: m.trimEnd,
+            speed: m.speed,
+            volume: m.volume
+          })),
+          savedAt: Date.now()
+        };
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).put(payload, 'latest');
+        await new Promise((res, rej) => {
+          tx.oncomplete = res;
+          tx.onerror = rej;
+        });
+        const badge = document.getElementById('autosaveBadge');
+        if (badge) badge.textContent = '已自動存檔';
+      } catch (e) {
+        const badge = document.getElementById('autosaveBadge');
+        if (badge) badge.textContent = '本機暫存';
+      }
+    }
+
+    async function restoreProjectFromDB() {
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get('latest');
+        const data = await new Promise((res, rej) => {
+          req.onsuccess = () => res(req.result);
+          req.onerror = rej;
+        });
+        if (!data) return;
+
+        applyProjectSettings(data);
+
+        if (data.musicFile) {
+          await loadMusicFile(data.musicFile, true);
+        }
+
+        if (Array.isArray(data.mediaItems) && data.mediaItems.length > 0) {
+          for (const saved of data.mediaItems) {
+            if (!saved.file) continue;
+            const url = URL.createObjectURL(saved.file);
+            if (saved.type === 'video') {
+              const item = await loadAsVideoItem(saved.file, url);
+              item.id = saved.id;
+              item.trimStart = saved.trimStart ?? 0;
+              item.trimEnd = saved.trimEnd ?? item.originalDuration;
+              item.speed = saved.speed ?? 1.0;
+              item.volume = saved.volume ?? 100;
+              state.mediaItems.push(item);
+            } else {
+              const imgEl = new Image();
+              await new Promise(r => { imgEl.onload = r; imgEl.onerror = r; imgEl.src = url; });
+              state.mediaItems.push({
+                id: saved.id,
+                type: 'photo',
+                name: saved.name,
+                url,
+                thumbUrl: url,
+                file: saved.file,
+                imgEl,
+                width: imgEl.naturalWidth || 1920,
+                height: imgEl.naturalHeight || 1080,
+                duration: saved.duration ?? 4,
+                motion: saved.motion ?? 'face-zoom',
+                focalPoint: saved.focalPoint ?? { x: 0.5, y: 0.38 }
+              });
+            }
+          }
+          if (state.mediaItems.length > 0) {
+            state.selectedClipId = state.mediaItems[0].id;
+          }
+        }
+
+        renderStoryboard();
+        renderLyricsList();
+        updateSyncConsole();
+        updateTimelineUI();
+        renderPreviewNow();
+        if (data.mediaItems?.length || data.musicFile || data.lyrics?.length) {
+          showToast('已自動恢復上次編輯進度！', 'success');
+        }
+      } catch (e) {}
+    }
+
+    function applyProjectSettings(data) {
+      if (data.aspectRatio) {
+        state.aspectRatio = data.aspectRatio;
+        document.getElementById('aspectRatioSelect').value = data.aspectRatio;
+      }
+      if (data.transition) {
+        state.transition = data.transition;
+        document.getElementById('transitionSelect').value = data.transition;
+      }
+      if (data.photoFit) {
+        state.photoFit = data.photoFit;
+        document.getElementById('photoFitSelect').value = data.photoFit;
+      }
+      if (data.style) {
+        Object.assign(state.style, data.style);
+        document.getElementById('fontFamilySelect').value = state.style.fontFamily;
+        document.getElementById('fontSizeRange').value = state.style.fontSize;
+        document.getElementById('fontSizeVal').textContent = `${state.style.fontSize}px`;
+        document.getElementById('subYRange').value = state.style.yPercent;
+        document.getElementById('subYVal').textContent = `${state.style.yPercent}%`;
+        document.getElementById('subColorInput').value = state.style.color;
+        document.getElementById('subStrokeColorInput').value = state.style.strokeColor;
+        document.getElementById('subStrokeToggle').checked = state.style.strokeEnabled;
+        document.getElementById('subBgToggle').checked = state.style.bgPill;
+      }
+      if (Array.isArray(data.lyrics)) {
+        state.lyrics = data.lyrics;
+        state.syncIndex = data.syncIndex ?? data.lyrics.length;
+        document.getElementById('lyricsPasteBox').value = data.lyrics.map(l => l.text).join('\n');
+      }
+      if (typeof data.musicVolume === 'number') {
+        state.music.volume = data.musicVolume;
+        const pct = Math.round(data.musicVolume * 100);
+        document.getElementById('musicVolumeRange').value = pct;
+        document.getElementById('musicVolumeVal').textContent = `${pct}%`;
+      }
+      resizePreviewCanvas();
+    }
+
+    // Export / Import JSON Record
+    document.getElementById('saveRecordBtn').addEventListener('click', () => {
+      const record = {
+        version: 1,
+        savedAt: new Date().toISOString(),
+        aspectRatio: state.aspectRatio,
+        transition: state.transition,
+        photoFit: state.photoFit,
+        style: state.style,
+        musicName: state.music.name,
+        musicVolume: state.music.volume,
+        lyrics: state.lyrics,
+        syncIndex: state.syncIndex,
+        mediaMeta: state.mediaItems.map(m => ({
+          type: m.type,
+          name: m.name,
+          duration: m.duration,
+          motion: m.motion,
+          focalPoint: m.focalPoint,
+          trimStart: m.trimStart,
+          trimEnd: m.trimEnd,
+          speed: m.speed,
+          volume: m.volume
+        }))
+      };
+      const blob = new Blob([JSON.stringify(record, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `mv-project-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      showToast('已下載專案紀錄檔 (.json)', 'success');
+    });
+
+    document.getElementById('loadRecordInput').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        applyProjectSettings(data);
+        // Apply metadata to matching uploaded media items by filename
+        if (Array.isArray(data.mediaMeta) && state.mediaItems.length > 0) {
+          for (const meta of data.mediaMeta) {
+            const match = state.mediaItems.find(m => m.name === meta.name);
+            if (match) {
+              Object.assign(match, {
+                duration: meta.duration ?? match.duration,
+                motion: meta.motion ?? match.motion,
+                focalPoint: meta.focalPoint ?? match.focalPoint,
+                trimStart: meta.trimStart ?? match.trimStart,
+                trimEnd: meta.trimEnd ?? match.trimEnd,
+                speed: meta.speed ?? match.speed,
+                volume: meta.volume ?? match.volume
+              });
+            }
+          }
+        }
+        renderStoryboard();
+        renderLyricsList();
+        updateSyncConsole();
+        updateTimelineUI();
+        renderPreviewNow();
+        scheduleAutoSave();
+        showToast('已讀取專案紀錄檔設定！', 'success');
+      } catch (err) {
+        showToast('紀錄檔格式無效', 'error');
+      }
+      e.target.value = '';
+    });
+
+    document.getElementById('newProjectBtn').addEventListener('click', () => {
+      document.getElementById('resetModal').classList.remove('hidden');
+    });
+    document.getElementById('cancelResetBtn').addEventListener('click', () => {
+      document.getElementById('resetModal').classList.add('hidden');
+    });
+    document.getElementById('confirmResetBtn').addEventListener('click', async () => {
+      pausePlayback();
+      state.mediaItems.forEach(m => {
+        URL.revokeObjectURL(m.url);
+        if (m.videoEl && m.videoEl.parentNode) m.videoEl.remove();
+      });
+      state.mediaItems = [];
+      state.selectedClipId = null;
+      if (state.music.url) URL.revokeObjectURL(state.music.url);
+      state.music = { file: null, url: null, name: '', audioEl: null, audioBuffer: null, duration: 0, volume: 1.0, peaks: [] };
+      state.lyrics = [];
+      state.syncIndex = 0;
+      state.playback.currentTime = 0;
+      document.getElementById('lyricsPasteBox').value = '';
+      document.getElementById('musicFileName').textContent = '尚未上傳音樂（MP3 / M4A / WAV）';
+      document.getElementById('visualizerHint').classList.remove('hidden');
+      try {
+        const db = await openDB();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        tx.objectStore(STORE_NAME).delete('latest');
+      } catch (e) {}
+      document.getElementById('resetModal').classList.add('hidden');
+      renderStoryboard();
+      renderLyricsList();
+      updateSyncConsole();
+      updateTimelineUI();
+      renderPreviewNow();
+      showToast('已開啟新專案', 'info');
+    });
+
+    // ==========================================
+    // 4. Tabs Switching
     // ==========================================
     document.querySelectorAll('.tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -604,7 +902,7 @@
     });
 
     // ==========================================
-    // 4. Face Detection Helper
+    // 5. Face Detection & Media Loading
     // ==========================================
     async function detectFaceFocalPoint(imgEl) {
       if ('FaceDetector' in window) {
@@ -623,22 +921,18 @@
       return { x: 0.5, y: 0.38 };
     }
 
-    // ==========================================
-    // 5. Bulletproof Photo vs Video Detection & Upload
-    // ==========================================
     async function detectIsVideo(file) {
       if (file.type && file.type.startsWith('video/')) return true;
       if (file.type && file.type.startsWith('image/')) return false;
       if (/\.(mp4|mov|webm|m4v|avi|mkv|3gp|ts)$/i.test(file.name || '')) return true;
       if (/\.(jpe?g|png|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || '')) return false;
 
-      // Inspect magic bytes when Android gallery strips MIME & extension
       try {
         const buf = new Uint8Array(await file.slice(0, 16).arrayBuffer());
         const ascii = String.fromCharCode(...buf.slice(4, 12));
-        if (ascii.includes('ftyp')) return true; // MP4 / MOV / M4V
-        if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return true; // WebM / MKV
-        if (String.fromCharCode(...buf.slice(0, 4)) === 'RIFF') return true; // AVI
+        if (ascii.includes('ftyp')) return true;
+        if (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return true;
+        if (String.fromCharCode(...buf.slice(0, 4)) === 'RIFF') return true;
       } catch (e) {}
       return false;
     }
@@ -651,23 +945,34 @@
       videoEl.setAttribute('webkit-playsinline', '');
       videoEl.preload = 'auto';
       videoEl.src = url;
+      // Attach to hidden DOM pool so mobile browsers keep decoding frames!
+      hiddenVideoPool.appendChild(videoEl);
       videoEl.load();
 
       await new Promise((res) => {
-        const timer = setTimeout(res, 3000);
+        const timer = setTimeout(res, 3500);
         videoEl.onloadeddata = () => { clearTimeout(timer); res(); };
-        videoEl.onloadedmetadata = () => {
-          // Wait briefly for first frame if possible
-          setTimeout(() => { clearTimeout(timer); res(); }, 150);
-        };
+        videoEl.oncanplay = () => { clearTimeout(timer); res(); };
         videoEl.onerror = () => { clearTimeout(timer); res(); };
       });
 
       const dur = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : 5;
-      // Seek slightly to capture thumbnail frame
+      // Seek to 0.05s to ensure first frame is decoded
+      try {
+        videoEl.currentTime = Math.min(0.05, dur / 2);
+        await new Promise(res => {
+          const t = setTimeout(res, 400);
+          videoEl.onseeked = () => { clearTimeout(t); res(); };
+        });
+      } catch (e) {}
+
       let thumbUrl = '';
+      const lastFrameCanvas = document.createElement('canvas');
+      lastFrameCanvas.width = videoEl.videoWidth || 640;
+      lastFrameCanvas.height = videoEl.videoHeight || 360;
       try {
         if (videoEl.videoWidth > 0) {
+          lastFrameCanvas.getContext('2d').drawImage(videoEl, 0, 0, lastFrameCanvas.width, lastFrameCanvas.height);
           const tc = document.createElement('canvas');
           tc.width = 160;
           tc.height = 90;
@@ -684,6 +989,7 @@
         thumbUrl,
         file,
         videoEl,
+        lastFrameCanvas,
         width: videoEl.videoWidth || 1920,
         height: videoEl.videoHeight || 1080,
         originalDuration: dur,
@@ -710,7 +1016,6 @@
           if (!state.selectedClipId) state.selectedClipId = item.id;
           videoCount++;
         } else {
-          // Try loading as Image; if Image fails (e.g. mislabeled video), fall back to Video!
           const imgEl = new Image();
           const imgOk = await new Promise((res) => {
             imgEl.onload = () => res(true);
@@ -750,6 +1055,7 @@
       renderStoryboard();
       updateTimelineUI();
       renderPreviewNow();
+      scheduleAutoSave();
       showToast(`已加入 ${photoCount} 張照片、${videoCount} 段短片`, 'success');
     });
 
@@ -761,16 +1067,16 @@
       renderStoryboard();
       updateTimelineUI();
       renderPreviewNow();
+      scheduleAutoSave();
       showToast(`已將所有照片設為 ${val} 秒`, 'success');
     });
 
     // ==========================================
-    // 6. YouTube Create-Style Storyboard & Dedicated Editor
+    // 6. Storyboard & Dedicated Clip Editor
     // ==========================================
     function renderStoryboard() {
       const strip = document.getElementById('storyboardStrip');
-      const countLabel = document.getElementById('clipCountLabel');
-      countLabel.textContent = `${state.mediaItems.length} 個片段`;
+      document.getElementById('clipCountLabel').textContent = `${state.mediaItems.length} 個片段`;
 
       if (state.mediaItems.length === 0) {
         state.selectedClipId = null;
@@ -878,28 +1184,26 @@
               <span class="text-emerald-400 font-semibold">剪裁後輸出長度: ${outDur}s</span>
             </div>
 
-            <!-- Trim Start & End Sliders -->
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-1">
                 <div class="flex justify-between text-[11px]">
                   <span class="text-slate-400">剪裁起點</span>
-                  <span id="trimStartLabel" class="font-mono text-emerald-400">${item.trimStart.toFixed(1)}s</span>
+                  <span class="font-mono text-emerald-400">${item.trimStart.toFixed(1)}s</span>
                 </div>
                 <input data-field="trimStart" data-id="${item.id}" type="range" min="0" max="${Math.max(0.2, item.originalDuration - 0.2).toFixed(2)}" step="0.1" value="${item.trimStart}" class="media-field w-full" />
               </div>
               <div class="space-y-1">
                 <div class="flex justify-between text-[11px]">
                   <span class="text-slate-400">剪裁終點</span>
-                  <span id="trimEndLabel" class="font-mono text-emerald-400">${item.trimEnd.toFixed(1)}s</span>
+                  <span class="font-mono text-emerald-400">${item.trimEnd.toFixed(1)}s</span>
                 </div>
                 <input data-field="trimEnd" data-id="${item.id}" type="range" min="0.2" max="${item.originalDuration.toFixed(2)}" step="0.1" value="${item.trimEnd}" class="media-field w-full" />
               </div>
             </div>
 
-            <!-- Speed Quick Buttons + Slider -->
             <div class="space-y-1.5">
               <div class="flex items-center justify-between text-[11px]">
-                <span class="text-slate-400">播放速度</span>
+                <span class="text-slate-400">播放速度 (${item.speed}x)</span>
                 <div class="flex items-center gap-1">
                   ${[0.5, 1.0, 1.5, 2.0].map(sp => `<button data-speed="${sp}" data-id="${item.id}" class="speed-preset px-2 py-0.5 rounded ${item.speed === sp ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}">${sp}x</button>`).join('')}
                 </div>
@@ -907,7 +1211,6 @@
               <input data-field="speed" data-id="${item.id}" type="range" min="0.25" max="4" step="0.25" value="${item.speed}" class="media-field w-full" />
             </div>
 
-            <!-- Volume Quick Mute + Slider -->
             <div class="space-y-1.5">
               <div class="flex items-center justify-between text-[11px]">
                 <span class="text-slate-400">短片原音音量: <strong class="text-white">${item.volume}%</strong></span>
@@ -928,7 +1231,6 @@
       if (!tile) return;
       state.selectedClipId = tile.dataset.selectId;
       renderStoryboard();
-      // Jump preview to the start of the selected clip so user sees it immediately
       if (!state.playback.isPlaying) {
         seekTo(getClipStartTime(state.selectedClipId) + 0.05);
       }
@@ -945,17 +1247,23 @@
           [state.mediaItems[idx - 1], state.mediaItems[idx]] = [state.mediaItems[idx], state.mediaItems[idx - 1]];
           renderStoryboard();
           renderPreviewNow();
+          scheduleAutoSave();
         } else if (action === 'down' && idx < state.mediaItems.length - 1) {
           [state.mediaItems[idx], state.mediaItems[idx + 1]] = [state.mediaItems[idx + 1], state.mediaItems[idx]];
           renderStoryboard();
           renderPreviewNow();
+          scheduleAutoSave();
         } else if (action === 'delete') {
           URL.revokeObjectURL(state.mediaItems[idx].url);
+          if (state.mediaItems[idx].videoEl && state.mediaItems[idx].videoEl.parentNode) {
+            state.mediaItems[idx].videoEl.remove();
+          }
           state.mediaItems.splice(idx, 1);
           state.selectedClipId = state.mediaItems[Math.min(idx, state.mediaItems.length - 1)]?.id || null;
           renderStoryboard();
           updateTimelineUI();
           renderPreviewNow();
+          scheduleAutoSave();
         } else if (action === 'focal') {
           openFocalModal(state.mediaItems[idx]);
         }
@@ -970,6 +1278,7 @@
           renderStoryboard();
           updateTimelineUI();
           renderPreviewNow();
+          scheduleAutoSave();
         }
         return;
       }
@@ -981,6 +1290,7 @@
           item.volume = item.volume === 0 ? 100 : 0;
           renderStoryboard();
           renderPreviewNow();
+          scheduleAutoSave();
         }
       }
     });
@@ -995,6 +1305,7 @@
       state.mediaItems.splice(toIdx, 0, moved);
       renderStoryboard();
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
     document.getElementById('clipEditorPanel').addEventListener('input', (e) => {
@@ -1012,22 +1323,17 @@
         if (field === 'trimStart') {
           v = Math.max(0, Math.min(v, item.trimEnd - 0.2));
           item.trimStart = v;
-          if (!state.playback.isPlaying && item.videoEl) {
-            item.videoEl.currentTime = v;
-          }
+          if (!state.playback.isPlaying && item.videoEl) item.videoEl.currentTime = v;
         } else if (field === 'trimEnd') {
           v = Math.min(item.originalDuration, Math.max(v, item.trimStart + 0.2));
           item.trimEnd = v;
-          if (!state.playback.isPlaying && item.videoEl) {
-            item.videoEl.currentTime = v;
-          }
+          if (!state.playback.isPlaying && item.videoEl) item.videoEl.currentTime = v;
         } else {
           item[field] = v;
         }
       }
       if (el.type === 'range') {
         renderSelectedClipEditor();
-        // Update badge duration in strip
         const stripDur = document.querySelector(`.clip-tile[data-select-id="${item.id}"] span:last-child`);
         if (stripDur) stripDur.textContent = `${getClipDuration(item).toFixed(1)}s`;
       } else {
@@ -1035,9 +1341,10 @@
       }
       updateTimelineUI();
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
-    // Focal Modal Logic
+    // Focal Modal
     function openFocalModal(item) {
       state.focalEditingId = item.id;
       const modal = document.getElementById('focalModal');
@@ -1061,11 +1368,13 @@
       const item = state.mediaItems.find(m => m.id === state.focalEditingId);
       if (!item) return;
       const rect = document.getElementById('focalModalImg').getBoundingClientRect();
-      const x = Math.min(0.95, Math.max(0.05, (e.clientX - rect.left) / rect.width));
-      const y = Math.min(0.95, Math.max(0.05, (e.clientY - rect.top) / rect.height));
-      item.focalPoint = { x, y };
+      item.focalPoint = {
+        x: Math.min(0.95, Math.max(0.05, (e.clientX - rect.left) / rect.width)),
+        y: Math.min(0.95, Math.max(0.05, (e.clientY - rect.top) / rect.height))
+      };
       updateFocalMarker(item.focalPoint);
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
     document.getElementById('autoDetectFocalBtn').addEventListener('click', async () => {
@@ -1074,6 +1383,7 @@
       item.focalPoint = await detectFaceFocalPoint(item.imgEl);
       updateFocalMarker(item.focalPoint);
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
     document.getElementById('closeFocalModalBtn').addEventListener('click', () => {
@@ -1087,11 +1397,8 @@
     // ==========================================
     // 7. Music Upload & Waveform Visualizer
     // ==========================================
-    document.getElementById('musicInput').addEventListener('change', async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+    async function loadMusicFile(file, silent = false) {
       if (state.music.url) URL.revokeObjectURL(state.music.url);
-
       const url = URL.createObjectURL(file);
       const audioEl = new Audio(url);
       audioEl.preload = 'auto';
@@ -1131,11 +1438,20 @@
         document.getElementById('visualizerHint').classList.add('hidden');
         updateTimelineUI();
         drawVisualizer(state.playback.currentTime);
-        showToast('音樂載入成功！', 'success');
+        if (!silent) {
+          scheduleAutoSave();
+          showToast('音樂載入成功！', 'success');
+        }
       } catch (err) {
-        showToast('無法解碼此音訊格式，請嘗試 MP3 或 WAV', 'error');
+        if (!silent) showToast('無法解碼此音訊格式，請嘗試 MP3 或 WAV', 'error');
         document.getElementById('musicFileName').textContent = '音訊載入失敗';
       }
+    }
+
+    document.getElementById('musicInput').addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await loadMusicFile(file, false);
       e.target.value = '';
     });
 
@@ -1146,6 +1462,7 @@
       if (state.music.audioEl) {
         state.music.audioEl.volume = Math.min(1, state.music.volume);
       }
+      scheduleAutoSave();
     });
 
     function drawVisualizer(t) {
@@ -1173,7 +1490,7 @@
     }
 
     // ==========================================
-    // 8. Lyrics, SRT Import/Export & Tap-to-Sync
+    // 8. Lyrics, Direct Min:Sec Inputs & SRT
     // ==========================================
     document.getElementById('loadLyricsTextBtn').addEventListener('click', () => {
       const raw = document.getElementById('lyricsPasteBox').value;
@@ -1192,6 +1509,7 @@
       state.syncIndex = 0;
       renderLyricsList();
       updateSyncConsole();
+      scheduleAutoSave();
       showToast(`已載入 ${lines.length} 句歌詞，可開始播放並點擊對時`, 'success');
     });
 
@@ -1234,6 +1552,7 @@
       renderLyricsList();
       updateSyncConsole();
       renderPreviewNow();
+      scheduleAutoSave();
     }
 
     document.getElementById('exportSrtBtn').addEventListener('click', () => {
@@ -1265,7 +1584,7 @@
       if (state.lyrics.length === 0) return showToast('請先載入歌詞', 'error');
       if (state.syncIndex >= state.lyrics.length) return showToast('所有歌詞都已標記完畢', 'info');
 
-      const t = Number(state.playback.currentTime.toFixed(2));
+      const t = Number(state.playback.currentTime.toFixed(1));
       const idx = state.syncIndex;
 
       if (idx > 0 && state.lyrics[idx - 1].end === null) {
@@ -1278,14 +1597,16 @@
       updateSyncConsole();
       renderLyricsList();
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
     document.getElementById('syncBreakBtn').addEventListener('click', () => {
       if (state.syncIndex <= 0) return;
       const prev = state.lyrics[state.syncIndex - 1];
-      prev.end = Number(state.playback.currentTime.toFixed(2));
+      prev.end = Number(state.playback.currentTime.toFixed(1));
       renderLyricsList();
       renderPreviewNow();
+      scheduleAutoSave();
       showToast('已標記間奏空白', 'info');
     });
 
@@ -1302,20 +1623,29 @@
       seekTo(backTo);
       updateSyncConsole();
       renderLyricsList();
+      scheduleAutoSave();
     });
 
     document.querySelectorAll('.global-shift-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const delta = parseFloat(btn.dataset.globalShift);
         state.lyrics.forEach(l => {
-          if (l.start !== null) l.start = Math.max(0, Number((l.start + delta).toFixed(2)));
-          if (l.end !== null) l.end = Math.max(0, Number((l.end + delta).toFixed(2)));
+          if (l.start !== null) l.start = Math.max(0, Number((l.start + delta).toFixed(1)));
+          if (l.end !== null) l.end = Math.max(0, Number((l.end + delta).toFixed(1)));
         });
         renderLyricsList();
         renderPreviewNow();
+        scheduleAutoSave();
         showToast(`全部歌詞已調整 ${delta > 0 ? '+' : ''}${delta} 秒`, 'info');
       });
     });
+
+    function splitMinSec(sec) {
+      if (sec === null || !isFinite(sec)) return { m: '', s: '' };
+      const m = Math.floor(sec / 60);
+      const s = Number((sec % 60).toFixed(1));
+      return { m, s };
+    }
 
     function renderLyricsList() {
       const container = document.getElementById('lyricsListContainer');
@@ -1324,27 +1654,35 @@
         return;
       }
       container.innerHTML = state.lyrics.map((l, idx) => {
-        const timeText = l.start !== null
-          ? `${formatTime(l.start)} → ${l.end !== null ? formatTime(l.end) : '下一句'}`
-          : '未對時';
         const isCurrent = idx === state.syncIndex;
+        const st = splitMinSec(l.start);
+        const autoEnd = l.end !== null ? l.end : (state.lyrics[idx + 1]?.start ?? null);
+        const en = splitMinSec(autoEnd);
+
         return `
           <div class="bg-slate-950/70 border ${isCurrent ? 'border-indigo-500' : 'border-slate-800'} rounded-xl p-2.5 space-y-2 text-xs">
             <div class="flex items-center justify-between gap-2">
-              <span class="font-mono text-[11px] ${l.start !== null ? 'text-emerald-400' : 'text-slate-500'}">${idx + 1}. ${timeText}</span>
-              <div class="flex items-center gap-1">
-                <button data-lshift="-0.5" data-id="${l.id}" class="lyric-shift-btn px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px]">-0.5s</button>
-                <button data-lshift="-0.1" data-id="${l.id}" class="lyric-shift-btn px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px]">-0.1s</button>
-                <button data-lshift="0.1" data-id="${l.id}" class="lyric-shift-btn px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px]">+0.1s</button>
-                <button data-lshift="0.5" data-id="${l.id}" class="lyric-shift-btn px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px]">+0.5s</button>
+              <span class="font-semibold text-slate-300">#${idx + 1}</span>
+              <div class="flex items-center gap-1 flex-wrap text-[11px]">
+                <span class="text-slate-400">起:</span>
+                <input data-tpart="startM" data-id="${l.id}" type="number" min="0" max="99" value="${st.m}" placeholder="分" class="lyric-time-input w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
+                <span>:</span>
+                <input data-tpart="startS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${st.s}" placeholder="秒" class="lyric-time-input w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
+                <span class="text-slate-400 ml-1">迄:</span>
+                <input data-tpart="endM" data-id="${l.id}" type="number" min="0" max="99" value="${en.m}" placeholder="分" class="lyric-time-input w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
+                <span>:</span>
+                <input data-tpart="endS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${en.s}" placeholder="秒" class="lyric-time-input w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
               </div>
             </div>
+
             <input data-lfield="text" data-id="${l.id}" type="text" value="${l.text.replace(/"/g, '&quot;')}" class="lyric-input w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-200" />
+
             <div class="flex items-center justify-between gap-2 text-[11px] text-slate-400">
-              <span>單句垂直位置: ${l.yOverride !== null ? l.yOverride + '%' : '跟隨全域'}</span>
-              <div class="flex items-center gap-1.5">
-                <input data-lfield="yOverride" data-id="${l.id}" type="range" min="8" max="92" value="${l.yOverride !== null ? l.yOverride : state.style.yPercent}" class="lyric-input w-24" />
-                <button data-lreset="${l.id}" class="lyric-reset-y text-indigo-400 hover:underline">重設</button>
+              <span>垂直位置: <strong class="text-slate-200">${l.yOverride !== null ? l.yOverride + '%' : '跟隨全域 (' + state.style.yPercent + '%)'}</strong></span>
+              <div class="flex items-center gap-1">
+                <button data-ymove="-5" data-id="${l.id}" class="lyric-ymove-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">上移</button>
+                <button data-ymove="5" data-id="${l.id}" class="lyric-ymove-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">下移</button>
+                <button data-lreset="${l.id}" class="lyric-reset-y px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400">重設</button>
               </div>
             </div>
           </div>
@@ -1353,15 +1691,15 @@
     }
 
     document.getElementById('lyricsListContainer').addEventListener('click', (e) => {
-      const shiftBtn = e.target.closest('.lyric-shift-btn');
-      if (shiftBtn) {
-        const l = state.lyrics.find(x => x.id === shiftBtn.dataset.id);
-        if (!l || l.start === null) return;
-        const d = parseFloat(shiftBtn.dataset.lshift);
-        l.start = Math.max(0, Number((l.start + d).toFixed(2)));
-        if (l.end !== null) l.end = Math.max(l.start + 0.2, Number((l.end + d).toFixed(2)));
+      const yMoveBtn = e.target.closest('.lyric-ymove-btn');
+      if (yMoveBtn) {
+        const l = state.lyrics.find(x => x.id === yMoveBtn.dataset.id);
+        if (!l) return;
+        const cur = l.yOverride !== null ? l.yOverride : state.style.yPercent;
+        l.yOverride = Math.min(92, Math.max(8, cur + parseInt(yMoveBtn.dataset.ymove, 10)));
         renderLyricsList();
         renderPreviewNow();
+        scheduleAutoSave();
         return;
       }
       const resetBtn = e.target.closest('.lyric-reset-y');
@@ -1371,8 +1709,39 @@
           l.yOverride = null;
           renderLyricsList();
           renderPreviewNow();
+          scheduleAutoSave();
         }
       }
+    });
+
+    document.getElementById('lyricsListContainer').addEventListener('change', (e) => {
+      const timeInput = e.target.closest('.lyric-time-input');
+      if (!timeInput) return;
+      const idx = state.lyrics.findIndex(x => x.id === timeInput.dataset.id);
+      if (idx === -1) return;
+      const l = state.lyrics[idx];
+
+      const row = timeInput.closest('.space-y-2');
+      const sM = parseFloat(row.querySelector('[data-tpart="startM"]').value) || 0;
+      const sS = parseFloat(row.querySelector('[data-tpart="startS"]').value) || 0;
+      const eMVal = row.querySelector('[data-tpart="endM"]').value;
+      const eSVal = row.querySelector('[data-tpart="endS"]').value;
+
+      l.start = Math.max(0, Number((sM * 60 + sS).toFixed(1)));
+      if (eMVal !== '' || eSVal !== '') {
+        const eM = parseFloat(eMVal) || 0;
+        const eS = parseFloat(eSVal) || 0;
+        l.end = Math.max(l.start + 0.1, Number((eM * 60 + eS).toFixed(1)));
+      }
+      // Prevent overlap with previous line if previous line had no explicit end or ended after this start
+      if (idx > 0 && state.lyrics[idx - 1].start !== null) {
+        if (state.lyrics[idx - 1].end === null || state.lyrics[idx - 1].end > l.start) {
+          state.lyrics[idx - 1].end = l.start;
+        }
+      }
+      renderLyricsList();
+      renderPreviewNow();
+      scheduleAutoSave();
     });
 
     document.getElementById('lyricsListContainer').addEventListener('input', (e) => {
@@ -1382,11 +1751,9 @@
       if (!l) return;
       if (el.dataset.lfield === 'text') {
         l.text = el.value;
-      } else if (el.dataset.lfield === 'yOverride') {
-        l.yOverride = parseInt(el.value, 10);
-        renderLyricsList();
+        renderPreviewNow();
+        scheduleAutoSave();
       }
-      renderPreviewNow();
     });
 
     // ==========================================
@@ -1395,67 +1762,94 @@
     document.getElementById('aspectRatioSelect').addEventListener('change', (e) => {
       state.aspectRatio = e.target.value;
       resizePreviewCanvas();
+      scheduleAutoSave();
     });
     document.getElementById('transitionSelect').addEventListener('change', (e) => {
       state.transition = e.target.value;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('photoFitSelect').addEventListener('change', (e) => {
       state.photoFit = e.target.value;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('fontFamilySelect').addEventListener('change', async (e) => {
       state.style.fontFamily = e.target.value;
       try { await document.fonts.ready; } catch (err) {}
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('fontSizeRange').addEventListener('input', (e) => {
       state.style.fontSize = parseInt(e.target.value, 10);
       document.getElementById('fontSizeVal').textContent = `${state.style.fontSize}px`;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('subYRange').addEventListener('input', (e) => {
       state.style.yPercent = parseInt(e.target.value, 10);
       document.getElementById('subYVal').textContent = `${state.style.yPercent}%`;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('subColorInput').addEventListener('input', (e) => {
       state.style.color = e.target.value;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.querySelectorAll('.color-preset').forEach(btn => {
       btn.addEventListener('click', () => {
         state.style.color = btn.dataset.color;
         document.getElementById('subColorInput').value = btn.dataset.color;
         renderPreviewNow();
+        scheduleAutoSave();
       });
     });
     document.getElementById('subStrokeColorInput').addEventListener('input', (e) => {
       state.style.strokeColor = e.target.value;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('subStrokeToggle').addEventListener('change', (e) => {
       state.style.strokeEnabled = e.target.checked;
       renderPreviewNow();
+      scheduleAutoSave();
     });
     document.getElementById('subBgToggle').addEventListener('change', (e) => {
       state.style.bgPill = e.target.checked;
       renderPreviewNow();
+      scheduleAutoSave();
     });
 
     // ==========================================
     // 10. Core Canvas Rendering Engine
     // ==========================================
     function drawMediaItem(ctx, W, H, item, progress, alpha = 1) {
-      const src = item.type === 'photo' ? item.imgEl : item.videoEl;
+      let src = item.type === 'photo' ? item.imgEl : item.videoEl;
       if (!src) return;
-      if (item.type === 'video' && src.readyState < 2) return;
+
+      // If video is mid-seek (readyState < 2), draw cached lastFrameCanvas instead of black!
+      if (item.type === 'video') {
+        if (src.readyState >= 2 && src.videoWidth > 0) {
+          if (item.lastFrameCanvas) {
+            try {
+              item.lastFrameCanvas.width = src.videoWidth;
+              item.lastFrameCanvas.height = src.videoHeight;
+              item.lastFrameCanvas.getContext('2d').drawImage(src, 0, 0);
+            } catch (e) {}
+          }
+        } else if (item.lastFrameCanvas && item.lastFrameCanvas.width > 0) {
+          src = item.lastFrameCanvas;
+        } else {
+          return;
+        }
+      }
 
       ctx.save();
       ctx.globalAlpha = alpha;
 
-      const srcW = item.width || (item.type === 'photo' ? src.naturalWidth : src.videoWidth) || 1920;
-      const srcH = item.height || (item.type === 'photo' ? src.naturalHeight : src.videoHeight) || 1080;
+      const srcW = item.width || src.naturalWidth || src.videoWidth || src.width || 1920;
+      const srcH = item.height || src.naturalHeight || src.videoHeight || src.height || 1080;
 
       let scale = 1;
       let panX = 0;
@@ -1508,7 +1902,8 @@
     }
 
     function getActiveLyricAtTime(t) {
-      for (let i = 0; i < state.lyrics.length; i++) {
+      // Iterate backwards so later-adjusted lines take priority if adjacent
+      for (let i = state.lyrics.length - 1; i >= 0; i--) {
         const l = state.lyrics[i];
         if (l.start === null) continue;
         const nextStart = state.lyrics[i + 1]?.start ?? Infinity;
@@ -1596,7 +1991,7 @@
       }
     }
 
-    function syncVideoElementsToTime(t) {
+    function syncVideoElementsToTime(t, forceSeek = false) {
       let acc = 0;
       for (const item of state.mediaItems) {
         const d = getClipDuration(item);
@@ -1604,13 +1999,14 @@
           if (t >= acc && t < acc + d) {
             const localT = t - acc;
             const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
-            if (Math.abs(item.videoEl.currentTime - targetSrcT) > (state.playback.isPlaying ? 0.3 : 0.05)) {
+            const threshold = forceSeek ? 0.03 : (state.playback.isPlaying ? 0.35 : 0.05);
+            if (Math.abs(item.videoEl.currentTime - targetSrcT) > threshold) {
               item.videoEl.currentTime = targetSrcT;
-              if (!state.playback.isPlaying) {
-                item.videoEl.onseeked = () => {
+              item.videoEl.onseeked = () => {
+                if (!state.playback.isPlaying) {
                   renderFrameAtTime(previewCtx, previewCanvas.width, previewCanvas.height, state.playback.currentTime);
-                };
-              }
+                }
+              };
             }
             item.videoEl.playbackRate = item.speed;
             item.videoEl.muted = item.volume === 0;
@@ -1628,8 +2024,8 @@
       }
     }
 
-    function renderPreviewNow() {
-      syncVideoElementsToTime(state.playback.currentTime);
+    function renderPreviewNow(forceVideoSeek = false) {
+      syncVideoElementsToTime(state.playback.currentTime, forceVideoSeek);
       renderFrameAtTime(previewCtx, previewCanvas.width, previewCanvas.height, state.playback.currentTime);
       drawVisualizer(state.playback.currentTime);
     }
@@ -1644,16 +2040,28 @@
     }
 
     // ==========================================
-    // 11. Playback & Touch Scrubbing
+    // 11. Playback & Synced Seek / Touch Scrubbing
     // ==========================================
     function seekTo(sec) {
       const total = getTotalDuration();
-      state.playback.currentTime = Math.min(total, Math.max(0, sec));
+      const target = Math.min(total, Math.max(0, sec));
+      state.playback.currentTime = target;
+      // Lock playbackLoop from reading stale audioEl.currentTime while seeking
+      state.playback.seekLockUntil = performance.now() + 240;
+      state.playback.lastTs = performance.now();
+
       if (state.music.audioEl && isFinite(state.music.duration)) {
-        state.music.audioEl.currentTime = Math.min(state.music.duration, state.playback.currentTime);
+        if (target < state.music.duration) {
+          state.music.audioEl.currentTime = target;
+          if (state.playback.isPlaying && state.music.audioEl.paused) {
+            state.music.audioEl.play().catch(() => {});
+          }
+        } else if (!state.music.audioEl.paused) {
+          state.music.audioEl.pause();
+        }
       }
       updateTimelineUI();
-      renderPreviewNow();
+      renderPreviewNow(true);
     }
 
     function togglePlay() {
@@ -1670,6 +2078,7 @@
         }
         state.playback.isPlaying = true;
         state.playback.lastTs = performance.now();
+        state.playback.seekLockUntil = performance.now() + 180;
         if (state.music.audioEl && state.playback.currentTime < state.music.duration) {
           state.music.audioEl.currentTime = state.playback.currentTime;
           state.music.audioEl.play().catch(() => {});
@@ -1707,8 +2116,11 @@
       const dt = (now - state.playback.lastTs) / 1000;
       state.playback.lastTs = now;
 
-      if (state.music.audioEl && !state.music.audioEl.paused && state.playback.currentTime < state.music.duration) {
-        state.playback.currentTime = state.music.audioEl.currentTime;
+      const audio = state.music.audioEl;
+      const canTrustAudioClock = audio && !audio.paused && !audio.seeking && now > state.playback.seekLockUntil && state.playback.currentTime < state.music.duration;
+
+      if (canTrustAudioClock) {
+        state.playback.currentTime = audio.currentTime;
       } else {
         state.playback.currentTime += dt;
       }
@@ -1745,8 +2157,7 @@
       scrubFromPointer(e.clientX);
     });
     scrubberTrack.addEventListener('pointermove', (e) => {
-      if (!state.playback.isScrubbing) return;
-      scrubFromPointer(e.clientX);
+      if (state.playback.isScrubbing) scrubFromPointer(e.clientX);
     });
     scrubberTrack.addEventListener('pointerup', () => {
       state.playback.isScrubbing = false;
@@ -1802,9 +2213,7 @@
       pctText.textContent = '0%';
       statusText.textContent = '檢查瀏覽器 WebCodecs MP4 編碼支援中...';
 
-      try {
-        await document.fonts.ready;
-      } catch (e) {}
+      try { await document.fonts.ready; } catch (e) {}
 
       const hasWebCodecs = 'VideoEncoder' in window && 'AudioEncoder' in window && typeof Mp4Muxer !== 'undefined';
       if (!hasWebCodecs) {
@@ -1828,14 +2237,9 @@
             bitrate: 8_000_000,
             framerate: FPS
           });
-          if (res.supported) {
-            chosenCodec = c;
-            break;
-          }
+          if (res.supported) { chosenCodec = c; break; }
         }
-        if (!chosenCodec) {
-          throw new Error('找不到支援 1080p H.264 編碼的設定');
-        }
+        if (!chosenCodec) throw new Error('找不到支援 1080p H.264 編碼的設定');
 
         const hasAudio = Boolean(state.music.audioBuffer);
         const muxer = new Mp4Muxer.Muxer({
@@ -1910,10 +2314,7 @@
         const exportCtx = exportCanvas.getContext('2d');
 
         for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
-          if (state.exportCancelled) {
-            videoEncoder.close();
-            return;
-          }
+          if (state.exportCancelled) { videoEncoder.close(); return; }
           const t = frameIdx / FPS;
 
           let acc = 0;
@@ -1972,10 +2373,11 @@
       }
     });
 
-    // Init
+    // Init & Auto-Restore
     resizePreviewCanvas();
     updateTimelineUI();
     lucide.createIcons();
+    restoreProjectFromDB();
   </script>
 </body>
 </html>

@@ -220,8 +220,14 @@
           </label>
         </div>
 
-        <div class="flex items-center justify-between gap-3 text-xs text-slate-300 bg-slate-950/60 rounded-xl p-2.5 border border-slate-800">
-          <span id="musicFileName" class="truncate text-slate-400">尚未上傳音樂（可先測試預覽或上傳 MP3 / M4A / WAV）</span>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 bg-slate-950/60 rounded-xl p-2.5 border border-slate-800">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <button id="musicPlayBtn" class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold flex items-center gap-1.5 shrink-0 transition">
+              <i id="musicPlayIcon" data-lucide="play" class="w-3.5 h-3.5"></i>
+              <span id="musicPlayText">播放音樂</span>
+            </button>
+            <span id="musicFileName" class="truncate text-slate-400">尚未上傳音樂（MP3 / M4A / WAV）</span>
+          </div>
           <div class="flex items-center gap-2 shrink-0">
             <i data-lucide="volume-2" class="w-3.5 h-3.5 text-slate-400"></i>
             <input id="musicVolumeRange" type="range" min="0" max="150" value="100" class="w-20" />
@@ -229,10 +235,10 @@
           </div>
         </div>
 
-        <div class="relative w-full h-20 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
-          <canvas id="visualizerCanvas" class="w-full h-full block"></canvas>
+        <div id="visualizerWrap" class="touch-scrubber relative w-full h-20 bg-slate-950 rounded-xl overflow-hidden border border-slate-800 cursor-pointer">
+          <canvas id="visualizerCanvas" class="w-full h-full block pointer-events-none"></canvas>
           <div id="visualizerHint" class="absolute inset-0 flex items-center justify-center text-xs text-slate-500 pointer-events-none">
-            上傳音樂後，播放時會顯示即時音訊頻譜動畫
+            上傳音樂後，可點擊播放或拖曳波形調整位置
           </div>
         </div>
       </div>
@@ -255,15 +261,13 @@
 
       <!-- Tab 1: Media -->
       <div id="tab-media" class="tab-panel p-4 space-y-4 flex-1 overflow-y-auto max-h-[75vh]">
-        <div class="grid grid-cols-2 gap-2">
-          <label class="cursor-pointer py-2.5 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-            <i data-lucide="image-plus" class="w-4 h-4"></i> 上傳照片 (可多選)
-            <input id="photoInput" type="file" accept="image/*" multiple class="hidden" />
+        <div class="space-y-1.5">
+          <label class="cursor-pointer w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600/25 to-emerald-600/25 hover:from-indigo-600/35 hover:to-emerald-600/35 border border-indigo-500/40 text-white text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition">
+            <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-300"></i>
+            同時上傳照片與短片（可多選混合挑選）
+            <input id="mediaInput" type="file" accept="image/*,video/*" multiple class="hidden" />
           </label>
-          <label class="cursor-pointer py-2.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-            <i data-lucide="video" class="w-4 h-4"></i> 上傳短片 (可多選)
-            <input id="videoInput" type="file" accept="video/*" multiple class="hidden" />
-          </label>
+          <p class="text-[11px] text-slate-400 text-center">匯入後可使用下方每張卡片的「順序編號」或「▲ / ▼」快速調整播放順序</p>
         </div>
 
         <!-- Global Photo Duration -->
@@ -310,11 +314,17 @@
 
         <!-- Tap-to-Sync Console -->
         <div class="bg-indigo-950/30 border border-indigo-500/30 rounded-xl p-3 space-y-2.5">
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between gap-2">
             <span class="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
               <i data-lucide="hand" class="w-4 h-4"></i> 點擊對時模式
             </span>
-            <span id="syncIndexLabel" class="text-[11px] font-mono text-slate-400">待命 (0 / 0)</span>
+            <div class="flex items-center gap-2">
+              <button id="syncPlayBtn" class="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-semibold flex items-center gap-1 transition">
+                <i id="syncPlayIcon" data-lucide="play" class="w-3 h-3"></i>
+                <span id="syncPlayText">播放音樂</span>
+              </button>
+              <span id="syncIndexLabel" class="text-[11px] font-mono text-slate-400">待命 (0 / 0)</span>
+            </div>
           </div>
           <div class="bg-slate-950/80 rounded-lg p-2.5 text-center space-y-1">
             <p class="text-[11px] text-slate-400">即將標記的歌詞：</p>
@@ -598,74 +608,76 @@
     // ==========================================
     // 5. Media Upload & List Rendering
     // ==========================================
-    document.getElementById('photoInput').addEventListener('change', async (e) => {
-      const files = Array.from(e.target.files || []);
-      for (const file of files) {
-        const url = URL.createObjectURL(file);
-        const imgEl = new Image();
-        await new Promise((res) => {
-          imgEl.onload = res;
-          imgEl.onerror = res;
-          imgEl.src = url;
-        });
-        const focalPoint = await detectFaceFocalPoint(imgEl);
-        const defaultDur = parseFloat(document.getElementById('globalPhotoDurInput').value) || 4;
-        state.mediaItems.push({
-          id: uid(),
-          type: 'photo',
-          name: file.name,
-          url,
-          file,
-          imgEl,
-          width: imgEl.naturalWidth || 1920,
-          height: imgEl.naturalHeight || 1080,
-          duration: defaultDur,
-          motion: 'face-zoom',
-          focalPoint
-        });
-      }
-      e.target.value = '';
-      renderMediaList();
-      updateTimelineUI();
-      renderPreviewNow();
-      if (files.length) showToast(`已加入 ${files.length} 張照片`, 'success');
-    });
+    function isVideoFile(file) {
+      if (file.type && file.type.startsWith('video/')) return true;
+      return /\.(mp4|mov|webm|m4v|avi|mkv|3gp)$/i.test(file.name || '');
+    }
 
-    document.getElementById('videoInput').addEventListener('change', async (e) => {
+    document.getElementById('mediaInput').addEventListener('change', async (e) => {
       const files = Array.from(e.target.files || []);
+      if (!files.length) return;
+      let photoCount = 0;
+      let videoCount = 0;
+
       for (const file of files) {
         const url = URL.createObjectURL(file);
-        const videoEl = document.createElement('video');
-        videoEl.src = url;
-        videoEl.muted = true;
-        videoEl.playsInline = true;
-        videoEl.preload = 'auto';
-        await new Promise((res) => {
-          videoEl.onloadedmetadata = res;
-          videoEl.onerror = res;
-        });
-        const dur = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : 5;
-        state.mediaItems.push({
-          id: uid(),
-          type: 'video',
-          name: file.name,
-          url,
-          file,
-          videoEl,
-          width: videoEl.videoWidth || 1920,
-          height: videoEl.videoHeight || 1080,
-          originalDuration: dur,
-          trimStart: 0,
-          trimEnd: Number(dur.toFixed(2)),
-          speed: 1.0,
-          volume: 100
-        });
+        if (isVideoFile(file)) {
+          const videoEl = document.createElement('video');
+          videoEl.src = url;
+          videoEl.muted = true;
+          videoEl.playsInline = true;
+          videoEl.preload = 'auto';
+          await new Promise((res) => {
+            videoEl.onloadedmetadata = res;
+            videoEl.onerror = res;
+          });
+          const dur = isFinite(videoEl.duration) && videoEl.duration > 0 ? videoEl.duration : 5;
+          state.mediaItems.push({
+            id: uid(),
+            type: 'video',
+            name: file.name,
+            url,
+            file,
+            videoEl,
+            width: videoEl.videoWidth || 1920,
+            height: videoEl.videoHeight || 1080,
+            originalDuration: dur,
+            trimStart: 0,
+            trimEnd: Number(dur.toFixed(2)),
+            speed: 1.0,
+            volume: 100
+          });
+          videoCount++;
+        } else {
+          const imgEl = new Image();
+          await new Promise((res) => {
+            imgEl.onload = res;
+            imgEl.onerror = res;
+            imgEl.src = url;
+          });
+          const focalPoint = await detectFaceFocalPoint(imgEl);
+          const defaultDur = parseFloat(document.getElementById('globalPhotoDurInput').value) || 4;
+          state.mediaItems.push({
+            id: uid(),
+            type: 'photo',
+            name: file.name,
+            url,
+            file,
+            imgEl,
+            width: imgEl.naturalWidth || 1920,
+            height: imgEl.naturalHeight || 1080,
+            duration: defaultDur,
+            motion: 'face-zoom',
+            focalPoint
+          });
+          photoCount++;
+        }
       }
       e.target.value = '';
       renderMediaList();
       updateTimelineUI();
       renderPreviewNow();
-      if (files.length) showToast(`已加入 ${files.length} 段短片`, 'success');
+      showToast(`已加入 ${photoCount} 張照片、${videoCount} 段短片`, 'success');
     });
 
     document.getElementById('applyGlobalPhotoDurBtn').addEventListener('click', () => {
@@ -688,14 +700,18 @@
 
       container.innerHTML = state.mediaItems.map((item, idx) => {
         const dur = getClipDuration(item).toFixed(1);
+        const orderOptions = state.mediaItems.map((_, i) => `<option value="${i}" ${i === idx ? 'selected' : ''}>#${i + 1}</option>`).join('');
         const moveBtns = `
-          <button data-action="up" data-id="${item.id}" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === 0 ? 'disabled' : ''} title="上移">
+          <select data-action="reorder" data-id="${item.id}" class="media-reorder bg-slate-900 border border-slate-700 text-indigo-300 font-mono text-[11px] rounded px-1.5 py-1" title="直接指定順序">
+            ${orderOptions}
+          </select>
+          <button data-action="up" data-id="${item.id}" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === 0 ? 'disabled' : ''} title="上移">
             <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i>
           </button>
-          <button data-action="down" data-id="${item.id}" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === state.mediaItems.length - 1 ? 'disabled' : ''} title="下移">
+          <button data-action="down" data-id="${item.id}" class="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30" ${idx === state.mediaItems.length - 1 ? 'disabled' : ''} title="下移">
             <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>
           </button>
-          <button data-action="delete" data-id="${item.id}" class="p-1 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400" title="刪除">
+          <button data-action="delete" data-id="${item.id}" class="p-1.5 rounded bg-rose-950/60 hover:bg-rose-900 text-rose-400" title="刪除">
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
           </button>
         `;
@@ -802,6 +818,18 @@
       } else if (action === 'focal') {
         openFocalModal(state.mediaItems[idx]);
       }
+    });
+
+    document.getElementById('mediaListContainer').addEventListener('change', (e) => {
+      const sel = e.target.closest('.media-reorder');
+      if (!sel) return;
+      const fromIdx = state.mediaItems.findIndex(m => m.id === sel.dataset.id);
+      const toIdx = parseInt(sel.value, 10);
+      if (fromIdx === -1 || isNaN(toIdx) || fromIdx === toIdx) return;
+      const [moved] = state.mediaItems.splice(fromIdx, 1);
+      state.mediaItems.splice(toIdx, 0, moved);
+      renderMediaList();
+      renderPreviewNow();
     });
 
     document.getElementById('mediaListContainer').addEventListener('input', (e) => {
@@ -1465,6 +1493,10 @@
         }
         document.getElementById('playPauseText').textContent = '暫停預覽';
         document.getElementById('playPauseIcon').setAttribute('data-lucide', 'pause');
+        document.getElementById('musicPlayText').textContent = '暫停音樂';
+        document.getElementById('musicPlayIcon').setAttribute('data-lucide', 'pause');
+        document.getElementById('syncPlayText').textContent = '暫停音樂';
+        document.getElementById('syncPlayIcon').setAttribute('data-lucide', 'pause');
         lucide.createIcons();
         playbackLoop();
       }
@@ -1479,6 +1511,10 @@
       });
       document.getElementById('playPauseText').textContent = '播放預覽';
       document.getElementById('playPauseIcon').setAttribute('data-lucide', 'play');
+      document.getElementById('musicPlayText').textContent = '播放音樂';
+      document.getElementById('musicPlayIcon').setAttribute('data-lucide', 'play');
+      document.getElementById('syncPlayText').textContent = '播放音樂';
+      document.getElementById('syncPlayIcon').setAttribute('data-lucide', 'play');
       lucide.createIcons();
     }
 
@@ -1509,6 +1545,28 @@
     }
 
     document.getElementById('playPauseBtn').addEventListener('click', togglePlay);
+    document.getElementById('musicPlayBtn').addEventListener('click', togglePlay);
+    document.getElementById('syncPlayBtn').addEventListener('click', togglePlay);
+
+    // Visualizer waveform touch/click scrub
+    const visWrap = document.getElementById('visualizerWrap');
+    let isVisScrubbing = false;
+    function scrubFromVis(clientX) {
+      const dur = state.music.duration || getTotalDuration();
+      if (!dur) return;
+      const rect = visWrap.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      seekTo(ratio * dur);
+    }
+    visWrap.addEventListener('pointerdown', (e) => {
+      isVisScrubbing = true;
+      visWrap.setPointerCapture(e.pointerId);
+      scrubFromVis(e.clientX);
+    });
+    visWrap.addEventListener('pointermove', (e) => {
+      if (isVisScrubbing) scrubFromVis(e.clientX);
+    });
+    visWrap.addEventListener('pointerup', () => { isVisScrubbing = false; });
     document.getElementById('skipBackBtn').addEventListener('click', () => seekTo(state.playback.currentTime - 5));
     document.getElementById('skipForwardBtn').addEventListener('click', () => seekTo(state.playback.currentTime + 5));
 

@@ -165,6 +165,10 @@
           <span class="hidden sm:inline">讀取紀錄</span>
           <input id="loadRecordInput" type="file" accept=".json,.mvproj" class="hidden" />
         </label>
+        <button id="copyLineLinkBtn" class="px-2.5 py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-medium flex items-center gap-1 transition" title="一鍵複製 LINE 專用外部開啟連結">
+          <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">LINE 連結</span>
+        </button>
         <button id="newProjectBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-300 text-xs font-medium transition" title="開新專案">
           新專案
         </button>
@@ -384,6 +388,15 @@
             <button data-global-shift="0.1" class="global-shift-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">+0.1s</button>
             <button data-global-shift="0.5" class="global-shift-btn px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200">+0.5s</button>
           </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button id="addIntroLyricBtn" class="py-2 px-3 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/35 border border-indigo-500/40 text-indigo-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 新增片頭字幕
+          </button>
+          <button id="addOutroLyricBtn" class="py-2 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> 新增片尾字幕
+          </button>
         </div>
 
         <div id="lyricsListContainer" class="space-y-2"></div>
@@ -845,6 +858,44 @@
         showToast('紀錄檔格式無效', 'error');
       }
       e.target.value = '';
+    });
+
+    document.getElementById('copyLineLinkBtn').addEventListener('click', async () => {
+      let shareUrl = 'https://63cepaper-dev.github.io/ymps-mv/?openExternalBrowser=1';
+      try {
+        if (window.location.protocol.startsWith('http')) {
+          const u = new URL(window.location.href);
+          u.searchParams.set('openExternalBrowser', '1');
+          shareUrl = u.toString();
+        }
+      } catch (e) {}
+
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(shareUrl);
+          copied = true;
+        }
+      } catch (e) {}
+
+      if (!copied) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = shareUrl;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          copied = document.execCommand('copy');
+          ta.remove();
+        } catch (e) {}
+      }
+
+      if (copied) {
+        showToast('已複製 LINE 專用連結，可直接貼到群組分享！', 'success');
+      } else {
+        showToast(`請手動複製：${shareUrl}`, 'info');
+      }
     });
 
     document.getElementById('newProjectBtn').addEventListener('click', () => {
@@ -1663,19 +1714,28 @@
           <div class="bg-slate-950/70 border ${isCurrent ? 'border-indigo-500' : 'border-slate-800'} rounded-xl p-2.5 space-y-2 text-xs">
             <div class="flex items-center justify-between gap-2">
               <span class="font-semibold text-slate-300">#${idx + 1}</span>
-              <div class="flex items-center gap-1 flex-wrap text-[11px]">
-                <span class="text-slate-400">起:</span>
-                <input data-tpart="startM" data-id="${l.id}" type="number" min="0" max="99" value="${st.m}" placeholder="分" class="lyric-time-input w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
-                <span>:</span>
-                <input data-tpart="startS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${st.s}" placeholder="秒" class="lyric-time-input w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
-                <span class="text-slate-400 ml-1">迄:</span>
-                <input data-tpart="endM" data-id="${l.id}" type="number" min="0" max="99" value="${en.m}" placeholder="分" class="lyric-time-input w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
-                <span>:</span>
-                <input data-tpart="endS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${en.s}" placeholder="秒" class="lyric-time-input w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
+              <div class="flex items-center gap-1.5">
+                <button data-insert-after="${l.id}" class="lyric-insert-btn px-2 py-0.5 rounded bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 text-[11px] font-medium transition">+ 往下插入</button>
+                <button data-delete-lyric="${l.id}" class="lyric-delete-btn px-2 py-0.5 rounded bg-rose-950/70 hover:bg-rose-900 text-rose-400 text-[11px] font-medium transition">刪除</button>
               </div>
             </div>
 
-            <input data-lfield="text" data-id="${l.id}" type="text" value="${l.text.replace(/"/g, '&quot;')}" class="lyric-input w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-200" />
+            <div class="flex items-center justify-between gap-1 text-[11px] bg-slate-900/50 rounded-lg px-2 py-1">
+              <div class="flex items-center gap-1">
+                <span class="text-slate-400">起</span>
+                <input data-tpart="startM" data-id="${l.id}" type="number" min="0" max="99" value="${st.m}" placeholder="分" class="lyric-time-input w-9 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
+                <span>:</span>
+                <input data-tpart="startS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${st.s}" placeholder="秒" class="lyric-time-input w-11 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-emerald-300 font-mono" />
+              </div>
+              <div class="flex items-center gap-1">
+                <span class="text-slate-400">迄</span>
+                <input data-tpart="endM" data-id="${l.id}" type="number" min="0" max="99" value="${en.m}" placeholder="分" class="lyric-time-input w-9 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
+                <span>:</span>
+                <input data-tpart="endS" data-id="${l.id}" type="number" min="0" max="59.9" step="0.1" value="${en.s}" placeholder="秒" class="lyric-time-input w-11 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-sky-300 font-mono" />
+              </div>
+            </div>
+
+            <input data-lfield="text" data-id="${l.id}" type="text" value="${l.text.replace(/"/g, '&quot;')}" placeholder="輸入字幕文字（片頭／歌詞／間奏／片尾）..." class="lyric-input w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-200" />
 
             <div class="flex items-center justify-between gap-2 text-[11px] text-slate-400">
               <span>垂直位置: <strong class="text-slate-200">${l.yOverride !== null ? l.yOverride + '%' : '跟隨全域 (' + state.style.yPercent + '%)'}</strong></span>
@@ -1688,9 +1748,79 @@
           </div>
         `;
       }).join('');
+      lucide.createIcons();
     }
 
+    function syncPasteBoxFromLyrics() {
+      document.getElementById('lyricsPasteBox').value = state.lyrics.map(l => l.text).join('\n');
+    }
+
+    document.getElementById('addIntroLyricBtn').addEventListener('click', () => {
+      const firstStart = state.lyrics[0]?.start;
+      const start = 0;
+      const end = (firstStart !== null && firstStart > 0.5) ? Number(Math.min(4, firstStart).toFixed(1)) : null;
+      state.lyrics.unshift({ id: uid(), text: '片頭標題文字', start, end, yOverride: null });
+      if (state.syncIndex > 0) state.syncIndex++;
+      syncPasteBoxFromLyrics();
+      renderLyricsList();
+      updateSyncConsole();
+      renderPreviewNow();
+      scheduleAutoSave();
+      showToast('已在最前面新增片頭字幕列', 'success');
+    });
+
+    document.getElementById('addOutroLyricBtn').addEventListener('click', () => {
+      const last = state.lyrics[state.lyrics.length - 1];
+      const lastEnd = last ? (last.end !== null ? last.end : (last.start !== null ? last.start + 4 : null)) : 0;
+      const start = lastEnd !== null ? Number(lastEnd.toFixed(1)) : null;
+      const end = start !== null ? Number((start + 4).toFixed(1)) : null;
+      state.lyrics.push({ id: uid(), text: '片尾感謝字幕', start, end, yOverride: null });
+      syncPasteBoxFromLyrics();
+      renderLyricsList();
+      updateSyncConsole();
+      renderPreviewNow();
+      scheduleAutoSave();
+      showToast('已在最後面新增片尾字幕列', 'success');
+    });
+
     document.getElementById('lyricsListContainer').addEventListener('click', (e) => {
+      const insertBtn = e.target.closest('.lyric-insert-btn');
+      if (insertBtn) {
+        const idx = state.lyrics.findIndex(x => x.id === insertBtn.dataset.insertAfter);
+        if (idx === -1) return;
+        const cur = state.lyrics[idx];
+        const next = state.lyrics[idx + 1];
+        const curEnd = cur.end !== null ? cur.end : (next?.start ?? (cur.start !== null ? cur.start + 3 : null));
+        const start = curEnd !== null ? Number(curEnd.toFixed(1)) : null;
+        const end = (start !== null && next?.start !== null && next?.start > start)
+          ? Number(next.start.toFixed(1))
+          : (start !== null ? Number((start + 3).toFixed(1)) : null);
+        state.lyrics.splice(idx + 1, 0, { id: uid(), text: '間奏／補充字幕', start, end, yOverride: null });
+        if (state.syncIndex > idx) state.syncIndex++;
+        syncPasteBoxFromLyrics();
+        renderLyricsList();
+        updateSyncConsole();
+        renderPreviewNow();
+        scheduleAutoSave();
+        showToast(`已在第 #${idx + 1} 句下方插入新字幕列`, 'success');
+        return;
+      }
+
+      const delBtn = e.target.closest('.lyric-delete-btn');
+      if (delBtn) {
+        const idx = state.lyrics.findIndex(x => x.id === delBtn.dataset.deleteLyric);
+        if (idx === -1) return;
+        state.lyrics.splice(idx, 1);
+        if (state.syncIndex > idx) state.syncIndex = Math.max(0, state.syncIndex - 1);
+        if (state.syncIndex > state.lyrics.length) state.syncIndex = state.lyrics.length;
+        syncPasteBoxFromLyrics();
+        renderLyricsList();
+        updateSyncConsole();
+        renderPreviewNow();
+        scheduleAutoSave();
+        showToast(`已刪除第 #${idx + 1} 句字幕`, 'info');
+        return;
+      }
       const yMoveBtn = e.target.closest('.lyric-ymove-btn');
       if (yMoveBtn) {
         const l = state.lyrics.find(x => x.id === yMoveBtn.dataset.id);

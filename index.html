@@ -2583,7 +2583,7 @@
 
         async function seekVideoAccurate(videoEl, targetTime) {
           if (!videoEl.paused) videoEl.pause();
-          if (Math.abs(videoEl.currentTime - targetTime) <= 0.004 && videoEl.readyState >= 2) {
+          if (Math.abs(videoEl.currentTime - targetTime) <= 0.008 && videoEl.readyState >= 2) {
             return;
           }
           await new Promise((res) => {
@@ -2592,18 +2592,11 @@
               if (done) return;
               done = true;
               clearTimeout(timer);
-              videoEl.removeEventListener('seeked', onSeeked);
+              videoEl.removeEventListener('seeked', finish);
               res();
             };
-            const onSeeked = () => {
-              if (typeof videoEl.requestVideoFrameCallback === 'function') {
-                videoEl.requestVideoFrameCallback(() => finish());
-              } else {
-                setTimeout(finish, 16);
-              }
-            };
-            const timer = setTimeout(finish, 2000);
-            videoEl.addEventListener('seeked', onSeeked, { once: true });
+            const timer = setTimeout(finish, 800);
+            videoEl.addEventListener('seeked', finish, { once: true });
             videoEl.currentTime = targetTime;
           });
         }

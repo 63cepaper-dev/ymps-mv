@@ -39,7 +39,7 @@
 <body class="min-h-screen flex flex-col">
 
   <!-- Hidden DOM Pool so Mobile Browsers Never Suspend Video Decoding -->
-  <div id="hiddenVideoPool" style="position:fixed;left:-9999px;top:-9999px;width:4px;height:4px;opacity:0.001;pointer-events:none;overflow:hidden;"></div>
+  <div id="hiddenVideoPool" style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.001;pointer-events:none;z-index:-1;overflow:hidden;"></div>
 
   <!-- LINE In-App Browser Overlay -->
   <div id="lineOverlay" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
@@ -679,12 +679,25 @@
           })),
           savedAt: Date.now()
         };
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        tx.objectStore(STORE_NAME).put(payload, 'latest');
-        await new Promise((res, rej) => {
-          tx.oncomplete = res;
-          tx.onerror = rej;
-        });
+        try {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          tx.objectStore(STORE_NAME).put(payload, 'latest');
+          await new Promise((res, rej) => {
+            tx.oncomplete = res;
+            tx.onerror = () => rej(tx.error);
+            tx.onabort = () => rej(tx.error);
+          });
+        } catch (quotaErr) {
+          // Fallback: save settings & lyrics without large video/audio blobs
+          payload.musicFile = null;
+          payload.mediaItems = payload.mediaItems.map(m => ({ ...m, file: m.type === 'photo' ? m.file : null }));
+          const tx2 = db.transaction(STORE_NAME, 'readwrite');
+          tx2.objectStore(STORE_NAME).put(payload, 'latest');
+          await new Promise((res, rej) => {
+            tx2.oncomplete = res;
+            tx2.onerror = rej;
+          });
+        }
         const badge = document.getElementById('autosaveBadge');
         if (badge) badge.textContent = '已自動存檔';
       } catch (e) {
@@ -2183,7 +2196,10 @@
             const targetVol = Math.min(1, item.volume / 100);
             if (Math.abs(item.videoEl.volume - targetVol) > 0.01) item.videoEl.volume = targetVol;
             if (state.playback.isPlaying && item.videoEl.paused) {
-              item.videoEl.play().catch(() => {});
+              item.videoEl.play().catch(() => {
+                item.videoEl.muted = true;
+                item.videoEl.play().catch(() => {});
+              });
             } else if (!state.playback.isPlaying && !item.videoEl.paused) {
               item.videoEl.pause();
             }
@@ -2253,6 +2269,26 @@
         if (state.music.audioEl && state.playback.currentTime < state.music.duration) {
           state.music.audioEl.currentTime = state.playback.currentTime;
           state.music.audioEl.play().catch(() => {});
+        }
+        // Directly trigger play() on active video clip inside the click gesture so mobile browsers never block it
+        let accT = 0;
+        for (const item of state.mediaItems) {
+          const d = getClipDuration(item);
+          if (item.type === 'video' && item.videoEl && state.playback.currentTime >= accT && state.playback.currentTime < accT + d) {
+            const localT = state.playback.currentTime - accT;
+            const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
+            if (Math.abs(item.videoEl.currentTime - targetSrcT) > 0.2) {
+              item.videoEl.currentTime = targetSrcT;
+            }
+            item.videoEl.playbackRate = item.speed;
+            item.videoEl.muted = item.volume === 0;
+            item.videoEl.volume = Math.min(1, item.volume / 100);
+            item.videoEl.play().catch(() => {
+              item.videoEl.muted = true;
+              item.videoEl.play().catch(() => {});
+            });
+          }
+          accT += d;
         }
         document.getElementById('playPauseText').textContent = '暫停預覽';
         document.getElementById('playPauseIcon').setAttribute('data-lucide', 'pause');

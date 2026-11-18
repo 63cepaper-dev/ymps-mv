@@ -156,10 +156,7 @@
           <option value="16:9">16:9 橫式</option>
           <option value="9:16">9:16 直式</option>
         </select>
-        <select id="resolutionSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-2 focus:outline-none">
-          <option value="1080p">1080p</option>
-          <option value="4k">4K (2160p)</option>
-        </select>
+
         <button id="saveRecordBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 transition" title="匯出專案紀錄檔 (.json)">
           <i data-lucide="save" class="w-3.5 h-3.5 text-sky-400"></i>
           <span class="hidden sm:inline">儲存紀錄</span>
@@ -178,7 +175,7 @@
         </button>
         <button id="exportBtn" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition">
           <i data-lucide="sparkles" class="w-4 h-4"></i>
-          <span id="exportBtnText">匯出 1080p MP4</span>
+          匯出 1080p MP4
         </button>
       </div>
     </div>
@@ -502,7 +499,6 @@
     // ==========================================
     const state = {
       aspectRatio: '16:9',
-      resolution: '1080p',
       transition: 'fade',
       photoFit: 'blur',
       mediaItems: [],
@@ -610,11 +606,7 @@
     }
 
     function getOutputDimensions() {
-      const is4k = state.resolution === '4k';
-      if (state.aspectRatio === '9:16') {
-        return is4k ? { w: 2160, h: 3840 } : { w: 1080, h: 1920 };
-      }
-      return is4k ? { w: 3840, h: 2160 } : { w: 1920, h: 1080 };
+      return state.aspectRatio === '9:16' ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 };
     }
 
     function resizePreviewCanvas() {
@@ -663,7 +655,6 @@
         const db = await openDB();
         const payload = {
           aspectRatio: state.aspectRatio,
-          resolution: state.resolution,
           transition: state.transition,
           photoFit: state.photoFit,
           style: state.style,
@@ -771,11 +762,7 @@
         state.aspectRatio = data.aspectRatio;
         document.getElementById('aspectRatioSelect').value = data.aspectRatio;
       }
-      if (data.resolution) {
-        state.resolution = data.resolution;
-        document.getElementById('resolutionSelect').value = data.resolution;
-        document.getElementById('exportBtnText').textContent = state.resolution === '4k' ? '匯出 4K MP4' : '匯出 1080p MP4';
-      }
+
       if (data.transition) {
         state.transition = data.transition;
         document.getElementById('transitionSelect').value = data.transition;
@@ -816,7 +803,6 @@
         version: 1,
         savedAt: new Date().toISOString(),
         aspectRatio: state.aspectRatio,
-        resolution: state.resolution,
         transition: state.transition,
         photoFit: state.photoFit,
         style: state.style,
@@ -1538,8 +1524,15 @@
     });
 
     function drawVisualizer(t) {
-      const w = visCanvas.width = visCanvas.clientWidth * (window.devicePixelRatio || 1);
-      const h = visCanvas.height = visCanvas.clientHeight * (window.devicePixelRatio || 1);
+      const dpr = window.devicePixelRatio || 1;
+      const targetW = Math.max(1, Math.round(visCanvas.clientWidth * dpr));
+      const targetH = Math.max(1, Math.round(visCanvas.clientHeight * dpr));
+      if (visCanvas.width !== targetW || visCanvas.height !== targetH) {
+        visCanvas.width = targetW;
+        visCanvas.height = targetH;
+      }
+      const w = visCanvas.width;
+      const h = visCanvas.height;
       visCtx.clearRect(0, 0, w, h);
 
       const peaks = state.music.peaks;
@@ -1915,11 +1908,7 @@
       resizePreviewCanvas();
       scheduleAutoSave();
     });
-    document.getElementById('resolutionSelect').addEventListener('change', (e) => {
-      state.resolution = e.target.value;
-      document.getElementById('exportBtnText').textContent = state.resolution === '4k' ? '匯出 4K MP4' : '匯出 1080p MP4';
-      scheduleAutoSave();
-    });
+
     document.getElementById('transitionSelect').addEventListener('change', (e) => {
       state.transition = e.target.value;
       renderPreviewNow();
@@ -1984,20 +1973,14 @@
       let src = item.type === 'photo' ? item.imgEl : item.videoEl;
       if (!src) return;
 
-      // If video is mid-seek (readyState < 2), draw cached lastFrameCanvas instead of black!
+      // Only fall back to cached frame if video is mid-seek; never reallocate canvas during 60fps playback
       if (item.type === 'video') {
-        if (src.readyState >= 2 && src.videoWidth > 0) {
-          if (item.lastFrameCanvas) {
-            try {
-              item.lastFrameCanvas.width = src.videoWidth;
-              item.lastFrameCanvas.height = src.videoHeight;
-              item.lastFrameCanvas.getContext('2d').drawImage(src, 0, 0);
-            } catch (e) {}
+        if (src.readyState < 2 || src.videoWidth === 0) {
+          if (item.lastFrameCanvas && item.lastFrameCanvas.width > 0) {
+            src = item.lastFrameCanvas;
+          } else {
+            return;
           }
-        } else if (item.lastFrameCanvas && item.lastFrameCanvas.width > 0) {
-          src = item.lastFrameCanvas;
-        } else {
-          return;
         }
       }
 
@@ -2171,18 +2154,31 @@
           if (t >= acc && t < acc + d) {
             const localT = t - acc;
             const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
-            const threshold = forceSeek ? 0.03 : (state.playback.isPlaying ? 0.35 : 0.05);
-            if (Math.abs(item.videoEl.currentTime - targetSrcT) > threshold) {
+            const threshold = forceSeek ? 0.03 : (state.playback.isPlaying ? 0.55 : 0.05);
+            if (Math.abs(item.videoEl.currentTime - targetSrcT) > threshold && !item.videoEl.seeking) {
               item.videoEl.currentTime = targetSrcT;
               item.videoEl.onseeked = () => {
+                if (item.lastFrameCanvas && item.videoEl.videoWidth > 0) {
+                  try {
+                    const cw = Math.min(640, item.videoEl.videoWidth);
+                    const ch = Math.round(cw * (item.videoEl.videoHeight / item.videoEl.videoWidth));
+                    if (item.lastFrameCanvas.width !== cw || item.lastFrameCanvas.height !== ch) {
+                      item.lastFrameCanvas.width = cw;
+                      item.lastFrameCanvas.height = ch;
+                    }
+                    item.lastFrameCanvas.getContext('2d').drawImage(item.videoEl, 0, 0, cw, ch);
+                  } catch (e) {}
+                }
                 if (!state.playback.isPlaying) {
                   renderFrameAtTime(previewCtx, previewCanvas.width, previewCanvas.height, state.playback.currentTime);
                 }
               };
             }
-            item.videoEl.playbackRate = item.speed;
-            item.videoEl.muted = item.volume === 0;
-            item.videoEl.volume = Math.min(1, item.volume / 100);
+            if (item.videoEl.playbackRate !== item.speed) item.videoEl.playbackRate = item.speed;
+            const shouldMute = item.volume === 0;
+            if (item.videoEl.muted !== shouldMute) item.videoEl.muted = shouldMute;
+            const targetVol = Math.min(1, item.volume / 100);
+            if (Math.abs(item.videoEl.volume - targetVol) > 0.01) item.videoEl.volume = targetVol;
             if (state.playback.isPlaying && item.videoEl.paused) {
               item.videoEl.play().catch(() => {});
             } else if (!state.playback.isPlaying && !item.videoEl.paused) {
@@ -2394,17 +2390,14 @@
       }
 
       const { w: W, h: H } = getOutputDimensions();
-      const is4k = state.resolution === '4k';
-      const targetBitrate = is4k ? 28_000_000 : 12_000_000;
-      const resLabel = is4k ? '4K' : '1080p';
+      const targetBitrate = 12_000_000;
+      const resLabel = '1080p';
       const FPS = 30;
       const totalFrames = Math.ceil(totalDuration * FPS);
       const sampleRate = 48000;
 
       try {
-        const candidateCodecs = is4k
-          ? ['avc1.640033', 'avc1.4d0033', 'avc1.420033', 'avc1.640034']
-          : ['avc1.420028', 'avc1.4d002a', 'avc1.640028', 'avc1.640033'];
+        const candidateCodecs = ['avc1.420028', 'avc1.4d002a', 'avc1.640028'];
         let chosenCodec = null;
         for (const c of candidateCodecs) {
           const res = await VideoEncoder.isConfigSupported({
@@ -2416,11 +2409,7 @@
           });
           if (res.supported) { chosenCodec = c; break; }
         }
-        if (!chosenCodec) {
-          throw new Error(is4k
-            ? '此裝置或瀏覽器不支援 4K 硬體編碼，請改選 1080p 匯出。'
-            : '找不到支援 1080p H.264 編碼的設定');
-        }
+        if (!chosenCodec) throw new Error('找不到支援 1080p H.264 編碼的設定');
 
         // Decode any unmuted video clip audio tracks before configuring muxer
         statusText.textContent = '正在混合音樂與短片音訊軌...';

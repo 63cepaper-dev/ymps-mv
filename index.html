@@ -121,6 +121,9 @@
         <div id="exportProgressBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-150" style="width: 0%"></div>
       </div>
       <p id="exportStatusText" class="text-xs text-slate-300">準備畫布與音訊混音中...</p>
+      <p class="text-[11px] text-amber-300/90 bg-amber-950/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+        ⚠️ 匯出期間請留在此畫面（勿切換到其他 App 或關閉螢幕），否則手機系統會將網頁降速。
+      </p>
       <div id="exportResultArea" class="hidden pt-2 space-y-2">
         <a id="exportDownloadLink" href="#" download="my-mv-1080p.mp4" class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition">
           <i data-lucide="download" class="w-4 h-4"></i>
@@ -2341,8 +2344,13 @@
         return;
       }
 
-      updateTimelineUI();
-      renderPreviewNow();
+      syncVideoElementsToTime(state.playback.currentTime, false);
+      renderFrameAtTime(previewCtx, previewCanvas.width, previewCanvas.height, state.playback.currentTime);
+      if (!state.playback._lastUiAt || now - state.playback._lastUiAt > 66) {
+        state.playback._lastUiAt = now;
+        updateTimelineUI();
+        drawVisualizer(state.playback.currentTime);
+      }
       state.playback.rafId = requestAnimationFrame(playbackLoop);
     }
 
@@ -2411,6 +2419,12 @@
 
       pausePlayback();
       state.exportCancelled = false;
+      let wakeLock = null;
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {}
 
       const modal = document.getElementById('exportModal');
       const bar = document.getElementById('exportProgressBar');
@@ -2654,6 +2668,10 @@
       } catch (err) {
         statusText.textContent = `匯出失敗：${err.message || err}`;
         showToast('匯出過程發生錯誤', 'error');
+      } finally {
+        if (wakeLock) {
+          wakeLock.release().catch(() => {});
+        }
       }
     });
 

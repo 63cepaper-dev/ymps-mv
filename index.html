@@ -159,6 +159,10 @@
           <option value="16:9">16:9 橫式</option>
           <option value="9:16">9:16 直式</option>
         </select>
+        <select id="fpsSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-2 focus:outline-none" title="輸出幀率">
+          <option value="30">30 fps</option>
+          <option value="24">24 fps</option>
+        </select>
 
         <button id="saveRecordBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 transition" title="匯出專案紀錄檔 (.json)">
           <i data-lucide="save" class="w-3.5 h-3.5 text-sky-400"></i>
@@ -502,6 +506,7 @@
     // ==========================================
     const state = {
       aspectRatio: '16:9',
+      exportFps: 30,
       transition: 'fade',
       photoFit: 'blur',
       mediaItems: [],
@@ -1924,6 +1929,10 @@
       resizePreviewCanvas();
       scheduleAutoSave();
     });
+    document.getElementById('fpsSelect').addEventListener('change', (e) => {
+      state.exportFps = parseInt(e.target.value, 10) || 30;
+      scheduleAutoSave();
+    });
 
     document.getElementById('transitionSelect').addEventListener('change', (e) => {
       state.transition = e.target.value;
@@ -2329,9 +2338,27 @@
       const audio = state.music.audioEl;
       const canTrustAudioClock = audio && !audio.paused && !audio.seeking && now > state.playback.seekLockUntil && state.playback.currentTime < state.music.duration;
 
+      let syncedToVideo = false;
+      if (!canTrustAudioClock && now > state.playback.seekLockUntil) {
+        let acc = 0;
+        for (const item of state.mediaItems) {
+          const d = getClipDuration(item);
+          if (state.playback.currentTime >= acc && state.playback.currentTime < acc + d) {
+            if (item.type === 'video' && item.videoEl && !item.videoEl.paused && !item.videoEl.seeking) {
+              const vTime = acc + (item.videoEl.currentTime - item.trimStart) / (item.speed || 1);
+              if (isFinite(vTime) && Math.abs(vTime - state.playback.currentTime) < 0.8) {
+                state.playback.currentTime = vTime;
+                syncedToVideo = true;
+              }
+            }
+            break;
+          }
+          acc += d;
+        }
+      }
       if (canTrustAudioClock) {
         state.playback.currentTime = audio.currentTime;
-      } else {
+      } else if (!syncedToVideo) {
         state.playback.currentTime += dt;
       }
 
@@ -2450,7 +2477,7 @@
       const { w: W, h: H } = getOutputDimensions();
       const targetBitrate = 12_000_000;
       const resLabel = '1080p';
-      const FPS = 30;
+      const FPS = state.exportFps || 30;
       const totalFrames = Math.ceil(totalDuration * FPS);
       const sampleRate = 48000;
 
@@ -2606,11 +2633,15 @@
               if (done) return;
               done = true;
               clearTimeout(timer);
-              videoEl.removeEventListener('seeked', finish);
+              videoEl.removeEventListener('seeked', onSeeked);
               res();
             };
+            const onSeeked = () => {
+              // Yield 1 rAF so Chromium commits the newly decoded video texture before drawImage
+              requestAnimationFrame(() => finish());
+            };
             const timer = setTimeout(finish, 800);
-            videoEl.addEventListener('seeked', finish, { once: true });
+            videoEl.addEventListener('seeked', onSeeked, { once: true });
             videoEl.currentTime = targetTime;
           });
         }

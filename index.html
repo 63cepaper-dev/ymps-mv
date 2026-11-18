@@ -156,6 +156,10 @@
           <option value="16:9">16:9 橫式</option>
           <option value="9:16">9:16 直式</option>
         </select>
+        <select id="resolutionSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2 py-2 focus:outline-none">
+          <option value="1080p">1080p</option>
+          <option value="4k">4K (2160p)</option>
+        </select>
         <button id="saveRecordBtn" class="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center gap-1 transition" title="匯出專案紀錄檔 (.json)">
           <i data-lucide="save" class="w-3.5 h-3.5 text-sky-400"></i>
           <span class="hidden sm:inline">儲存紀錄</span>
@@ -174,7 +178,7 @@
         </button>
         <button id="exportBtn" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg shadow-indigo-600/25 transition">
           <i data-lucide="sparkles" class="w-4 h-4"></i>
-          匯出 1080p MP4
+          <span id="exportBtnText">匯出 1080p MP4</span>
         </button>
       </div>
     </div>
@@ -498,6 +502,7 @@
     // ==========================================
     const state = {
       aspectRatio: '16:9',
+      resolution: '1080p',
       transition: 'fade',
       photoFit: 'blur',
       mediaItems: [],
@@ -605,13 +610,22 @@
     }
 
     function getOutputDimensions() {
-      return state.aspectRatio === '9:16' ? { w: 1080, h: 1920 } : { w: 1920, h: 1080 };
+      const is4k = state.resolution === '4k';
+      if (state.aspectRatio === '9:16') {
+        return is4k ? { w: 2160, h: 3840 } : { w: 1080, h: 1920 };
+      }
+      return is4k ? { w: 3840, h: 2160 } : { w: 1920, h: 1080 };
     }
 
     function resizePreviewCanvas() {
-      const dims = getOutputDimensions();
-      previewCanvas.width = dims.w / 2;
-      previewCanvas.height = dims.h / 2;
+      // Keep live preview at 540p/960p for smooth real-time playback regardless of 1080p/4K export
+      if (state.aspectRatio === '9:16') {
+        previewCanvas.width = 540;
+        previewCanvas.height = 960;
+      } else {
+        previewCanvas.width = 960;
+        previewCanvas.height = 540;
+      }
       renderPreviewNow();
     }
 
@@ -649,6 +663,7 @@
         const db = await openDB();
         const payload = {
           aspectRatio: state.aspectRatio,
+          resolution: state.resolution,
           transition: state.transition,
           photoFit: state.photoFit,
           style: state.style,
@@ -756,6 +771,11 @@
         state.aspectRatio = data.aspectRatio;
         document.getElementById('aspectRatioSelect').value = data.aspectRatio;
       }
+      if (data.resolution) {
+        state.resolution = data.resolution;
+        document.getElementById('resolutionSelect').value = data.resolution;
+        document.getElementById('exportBtnText').textContent = state.resolution === '4k' ? '匯出 4K MP4' : '匯出 1080p MP4';
+      }
       if (data.transition) {
         state.transition = data.transition;
         document.getElementById('transitionSelect').value = data.transition;
@@ -796,6 +816,7 @@
         version: 1,
         savedAt: new Date().toISOString(),
         aspectRatio: state.aspectRatio,
+        resolution: state.resolution,
         transition: state.transition,
         photoFit: state.photoFit,
         style: state.style,
@@ -1894,6 +1915,11 @@
       resizePreviewCanvas();
       scheduleAutoSave();
     });
+    document.getElementById('resolutionSelect').addEventListener('change', (e) => {
+      state.resolution = e.target.value;
+      document.getElementById('exportBtnText').textContent = state.resolution === '4k' ? '匯出 4K MP4' : '匯出 1080p MP4';
+      scheduleAutoSave();
+    });
     document.getElementById('transitionSelect').addEventListener('change', (e) => {
       state.transition = e.target.value;
       renderPreviewNow();
@@ -2004,17 +2030,33 @@
       }
 
       if (state.photoFit === 'blur') {
-        const bgScale = Math.max(W / srcW, H / srcH) * 1.1;
-        const bw = srcW * bgScale;
-        const bh = srcH * bgScale;
-        ctx.save();
-        ctx.filter = 'blur(24px) brightness(0.55)';
-        ctx.drawImage(src, (W - bw) / 2, (H - bh) / 2, bw, bh);
-        ctx.restore();
-
         const fgScale = Math.min(W / srcW, H / srcH) * scale;
         const fw = srcW * fgScale;
         const fh = srcH * fgScale;
+        const needsBlurBg = (fw < W - 2 || fh < H - 2 || panX !== 0 || panY !== 0);
+        if (needsBlurBg) {
+          if (!window._blurCanvas) {
+            window._blurCanvas = document.createElement('canvas');
+            window._blurCtx = window._blurCanvas.getContext('2d');
+          }
+          const bc = window._blurCanvas;
+          const bctx = window._blurCtx;
+          const bwSmall = Math.max(120, Math.round(W / 8));
+          const bhSmall = Math.max(120, Math.round(H / 8));
+          if (bc.width !== bwSmall || bc.height !== bhSmall) {
+            bc.width = bwSmall;
+            bc.height = bhSmall;
+          }
+          const bgScale = Math.max(bwSmall / srcW, bhSmall / srcH) * 1.1;
+          const bw = srcW * bgScale;
+          const bh = srcH * bgScale;
+          bctx.clearRect(0, 0, bwSmall, bhSmall);
+          bctx.save();
+          bctx.filter = 'blur(6px) brightness(0.55)';
+          bctx.drawImage(src, (bwSmall - bw) / 2, (bhSmall - bh) / 2, bw, bh);
+          bctx.restore();
+          ctx.drawImage(bc, 0, 0, W, H);
+        }
         ctx.drawImage(src, (W - fw) / 2 + panX * W, (H - fh) / 2 + panY * H, fw, fh);
       } else if (state.photoFit === 'cover') {
         const covScale = Math.max(W / srcW, H / srcH) * scale;
@@ -2352,26 +2394,60 @@
       }
 
       const { w: W, h: H } = getOutputDimensions();
+      const is4k = state.resolution === '4k';
+      const targetBitrate = is4k ? 28_000_000 : 12_000_000;
+      const resLabel = is4k ? '4K' : '1080p';
       const FPS = 30;
       const totalFrames = Math.ceil(totalDuration * FPS);
       const sampleRate = 48000;
 
       try {
-        const candidateCodecs = ['avc1.420028', 'avc1.4d002a', 'avc1.640028'];
+        const candidateCodecs = is4k
+          ? ['avc1.640033', 'avc1.4d0033', 'avc1.420033', 'avc1.640034']
+          : ['avc1.420028', 'avc1.4d002a', 'avc1.640028', 'avc1.640033'];
         let chosenCodec = null;
         for (const c of candidateCodecs) {
           const res = await VideoEncoder.isConfigSupported({
             codec: c,
             width: W,
             height: H,
-            bitrate: 8_000_000,
+            bitrate: targetBitrate,
             framerate: FPS
           });
           if (res.supported) { chosenCodec = c; break; }
         }
-        if (!chosenCodec) throw new Error('找不到支援 1080p H.264 編碼的設定');
+        if (!chosenCodec) {
+          throw new Error(is4k
+            ? '此裝置或瀏覽器不支援 4K 硬體編碼，請改選 1080p 匯出。'
+            : '找不到支援 1080p H.264 編碼的設定');
+        }
 
-        const hasAudio = Boolean(state.music.audioBuffer);
+        // Decode any unmuted video clip audio tracks before configuring muxer
+        statusText.textContent = '正在混合音樂與短片音訊軌...';
+        const videoAudioTracks = [];
+        const tempAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let clipAcc = 0;
+        for (const item of state.mediaItems) {
+          const clipDur = getClipDuration(item);
+          if (item.type === 'video' && item.volume > 0 && item.file) {
+            try {
+              const ab = await item.file.arrayBuffer();
+              const decoded = await tempAudioCtx.decodeAudioData(ab);
+              videoAudioTracks.push({
+                buffer: decoded,
+                when: clipAcc,
+                offset: item.trimStart || 0,
+                duration: Math.max(0.1, (item.trimEnd || decoded.duration) - (item.trimStart || 0)),
+                speed: item.speed || 1,
+                gain: item.volume / 100
+              });
+            } catch (e) {}
+          }
+          clipAcc += clipDur;
+        }
+        tempAudioCtx.close().catch(() => {});
+
+        const hasAudio = Boolean(state.music.audioBuffer) || videoAudioTracks.length > 0;
         const muxer = new Mp4Muxer.Muxer({
           target: new Mp4Muxer.ArrayBufferTarget(),
           video: { codec: 'avc', width: W, height: H },
@@ -2387,21 +2463,32 @@
           codec: chosenCodec,
           width: W,
           height: H,
-          bitrate: 8_000_000,
+          bitrate: targetBitrate,
           framerate: FPS
         });
 
         let audioEncoder = null;
         if (hasAudio) {
-          statusText.textContent = '正在混合音訊軌...';
           const offlineCtx = new OfflineAudioContext(2, Math.ceil(totalDuration * sampleRate), sampleRate);
-          const srcNode = offlineCtx.createBufferSource();
-          srcNode.buffer = state.music.audioBuffer;
-          const gainNode = offlineCtx.createGain();
-          gainNode.gain.value = state.music.volume;
-          srcNode.connect(gainNode);
-          gainNode.connect(offlineCtx.destination);
-          srcNode.start(0);
+          if (state.music.audioBuffer && state.music.volume > 0) {
+            const srcNode = offlineCtx.createBufferSource();
+            srcNode.buffer = state.music.audioBuffer;
+            const gainNode = offlineCtx.createGain();
+            gainNode.gain.value = state.music.volume;
+            srcNode.connect(gainNode);
+            gainNode.connect(offlineCtx.destination);
+            srcNode.start(0);
+          }
+          for (const vt of videoAudioTracks) {
+            const vSrc = offlineCtx.createBufferSource();
+            vSrc.buffer = vt.buffer;
+            vSrc.playbackRate.value = vt.speed;
+            const vGain = offlineCtx.createGain();
+            vGain.gain.value = vt.gain;
+            vSrc.connect(vGain);
+            vGain.connect(offlineCtx.destination);
+            vSrc.start(vt.when, vt.offset, vt.duration);
+          }
           const mixedBuf = await offlineCtx.startRendering();
 
           audioEncoder = new AudioEncoder({
@@ -2443,23 +2530,46 @@
         exportCanvas.height = H;
         const exportCtx = exportCanvas.getContext('2d');
 
+        async function seekVideoAccurate(videoEl, targetTime) {
+          if (!videoEl.paused) videoEl.pause();
+          if (Math.abs(videoEl.currentTime - targetTime) <= 0.004 && videoEl.readyState >= 2) {
+            return;
+          }
+          await new Promise((res) => {
+            let done = false;
+            const finish = () => {
+              if (done) return;
+              done = true;
+              clearTimeout(timer);
+              videoEl.removeEventListener('seeked', onSeeked);
+              res();
+            };
+            const onSeeked = () => {
+              if (typeof videoEl.requestVideoFrameCallback === 'function') {
+                videoEl.requestVideoFrameCallback(() => finish());
+              } else {
+                setTimeout(finish, 16);
+              }
+            };
+            const timer = setTimeout(finish, 2000);
+            videoEl.addEventListener('seeked', onSeeked, { once: true });
+            videoEl.currentTime = targetTime;
+          });
+        }
+
         for (let frameIdx = 0; frameIdx < totalFrames; frameIdx++) {
           if (state.exportCancelled) { videoEncoder.close(); return; }
           const t = frameIdx / FPS;
 
           let acc = 0;
-          for (const item of state.mediaItems) {
+          for (let i = 0; i < state.mediaItems.length; i++) {
+            const item = state.mediaItems[i];
             const d = getClipDuration(item);
-            if (item.type === 'video' && item.videoEl && t >= acc && t < acc + d) {
-              const localT = t - acc;
+            const isActive = (t >= acc && t < acc + d) || (i === state.mediaItems.length - 1 && t >= acc);
+            if (isActive && item.type === 'video' && item.videoEl) {
+              const localT = Math.max(0, t - acc);
               const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
-              if (Math.abs(item.videoEl.currentTime - targetSrcT) > 0.02) {
-                item.videoEl.currentTime = targetSrcT;
-                await new Promise(res => {
-                  const timer = setTimeout(res, 250);
-                  item.videoEl.onseeked = () => { clearTimeout(timer); res(); };
-                });
-              }
+              await seekVideoAccurate(item.videoEl, targetSrcT);
             }
             acc += d;
           }
@@ -2480,7 +2590,7 @@
             const pct = Math.round(((frameIdx + 1) / totalFrames) * 100);
             bar.style.width = `${pct}%`;
             pctText.textContent = `${pct}%`;
-            statusText.textContent = `正在渲染 1080p 影格 (${frameIdx + 1} / ${totalFrames})...`;
+            statusText.textContent = `正在渲染 ${resLabel} 影格 (${frameIdx + 1} / ${totalFrames})...`;
             await new Promise(r => setTimeout(r, 0));
           }
         }
@@ -2493,10 +2603,10 @@
         const blob = new Blob([buffer], { type: 'video/mp4' });
         const outUrl = URL.createObjectURL(blob);
         dlLink.href = outUrl;
-        dlLink.download = `mv-1080p-${Date.now()}.mp4`;
+        dlLink.download = `mv-${resLabel.toLowerCase()}-${Date.now()}.mp4`;
         resultArea.classList.remove('hidden');
-        statusText.textContent = '1080p MP4 合成完成！';
-        showToast('1080p MP4 合成完成！', 'success');
+        statusText.textContent = `${resLabel} MP4 合成完成！`;
+        showToast(`${resLabel} MP4 合成完成！`, 'success');
       } catch (err) {
         statusText.textContent = `匯出失敗：${err.message || err}`;
         showToast('匯出過程發生錯誤', 'error');

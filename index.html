@@ -2154,8 +2154,11 @@
           if (t >= acc && t < acc + d) {
             const localT = t - acc;
             const targetSrcT = Math.min(item.trimEnd, item.trimStart + localT * item.speed);
-            const threshold = forceSeek ? 0.03 : (state.playback.isPlaying ? 0.55 : 0.05);
-            if (Math.abs(item.videoEl.currentTime - targetSrcT) > threshold && !item.videoEl.seeking) {
+            const nowMs = performance.now();
+            const canAutoResync = !state.playback.isPlaying || (nowMs - (item._lastSeekAt || 0) > 2500);
+            const threshold = forceSeek ? 0.04 : (state.playback.isPlaying ? 1.2 : 0.05);
+            if ((forceSeek || canAutoResync) && Math.abs(item.videoEl.currentTime - targetSrcT) > threshold && !item.videoEl.seeking) {
+              item._lastSeekAt = nowMs;
               item.videoEl.currentTime = targetSrcT;
               item.videoEl.onseeked = () => {
                 if (item.lastFrameCanvas && item.videoEl.videoWidth > 0) {
@@ -2215,7 +2218,7 @@
       const target = Math.min(total, Math.max(0, sec));
       state.playback.currentTime = target;
       // Lock playbackLoop from reading stale audioEl.currentTime while seeking
-      state.playback.seekLockUntil = performance.now() + 240;
+      state.playback.seekLockUntil = performance.now() + 550;
       state.playback.lastTs = performance.now();
 
       if (state.music.audioEl && isFinite(state.music.duration)) {
@@ -2324,8 +2327,13 @@
       scrubberTrack.setPointerCapture(e.pointerId);
       scrubFromPointer(e.clientX);
     });
+    let lastScrubAt = 0;
     scrubberTrack.addEventListener('pointermove', (e) => {
-      if (state.playback.isScrubbing) scrubFromPointer(e.clientX);
+      if (!state.playback.isScrubbing) return;
+      const now = performance.now();
+      if (now - lastScrubAt < 80) return;
+      lastScrubAt = now;
+      scrubFromPointer(e.clientX);
     });
     scrubberTrack.addEventListener('pointerup', () => {
       state.playback.isScrubbing = false;
@@ -2436,11 +2444,31 @@
         }
         tempAudioCtx.close().catch(() => {});
 
-        const hasAudio = Boolean(state.music.audioBuffer) || videoAudioTracks.length > 0;
+        let chosenAudioCfg = null;
+        const hasAudioSource = (Boolean(state.music.audioBuffer) && state.music.volume > 0) || videoAudioTracks.length > 0;
+        if (hasAudioSource) {
+          for (const sr of [48000, 44100]) {
+            try {
+              const sup = await AudioEncoder.isConfigSupported({
+                codec: 'mp4a.40.2',
+                numberOfChannels: 2,
+                sampleRate: sr,
+                bitrate: 192_000
+              });
+              if (sup.supported) {
+                chosenAudioCfg = { codec: 'mp4a.40.2', numberOfChannels: 2, sampleRate: sr, bitrate: 192_000 };
+                break;
+              }
+            } catch (e) {}
+          }
+        }
+        const hasAudio = Boolean(chosenAudioCfg);
+        const activeSampleRate = chosenAudioCfg ? chosenAudioCfg.sampleRate : sampleRate;
+
         const muxer = new Mp4Muxer.Muxer({
           target: new Mp4Muxer.ArrayBufferTarget(),
           video: { codec: 'avc', width: W, height: H },
-          audio: hasAudio ? { codec: 'aac', numberOfChannels: 2, sampleRate } : undefined,
+          audio: hasAudio ? { codec: 'aac', numberOfChannels: 2, sampleRate: activeSampleRate } : undefined,
           fastStart: 'in-memory'
         });
 
@@ -2458,7 +2486,7 @@
 
         let audioEncoder = null;
         if (hasAudio) {
-          const offlineCtx = new OfflineAudioContext(2, Math.ceil(totalDuration * sampleRate), sampleRate);
+          const offlineCtx = new OfflineAudioContext(2, Math.ceil(totalDuration * activeSampleRate), activeSampleRate);
           if (state.music.audioBuffer && state.music.volume > 0) {
             const srcNode = offlineCtx.createBufferSource();
             srcNode.buffer = state.music.audioBuffer;
@@ -2484,12 +2512,7 @@
             output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
             error: (e) => { throw e; }
           });
-          audioEncoder.configure({
-            codec: 'mp4a.40.2',
-            numberOfChannels: 2,
-            sampleRate,
-            bitrate: 192_000
-          });
+          audioEncoder.configure(chosenAudioCfg);
 
           const ch0 = mixedBuf.getChannelData(0);
           const ch1 = mixedBuf.numberOfChannels > 1 ? mixedBuf.getChannelData(1) : ch0;
@@ -2502,14 +2525,17 @@
             planar.set(ch1.subarray(offset, offset + len), len);
             const audioData = new AudioData({
               format: 'f32-planar',
-              sampleRate,
+              sampleRate: activeSampleRate,
               numberOfFrames: len,
               numberOfChannels: 2,
-              timestamp: Math.round((offset / sampleRate) * 1_000_000),
+              timestamp: Math.round((offset / activeSampleRate) * 1_000_000),
               data: planar
             });
             audioEncoder.encode(audioData);
             audioData.close();
+            if (audioEncoder.encodeQueueSize > 16) {
+              await new Promise(r => setTimeout(r, 5));
+            }
           }
           await audioEncoder.flush();
         }
